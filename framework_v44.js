@@ -318,8 +318,7 @@ export const blueprint = (componentName, setupFn) => {
         exportAction: (portName, actionDef) => compiler.registerExportAction(portName, actionDef.actionId),
 
         // 4. EVENT BINDING
-        on: (selector, eventName, actionDef, extractMap) => {
-            // CẬP NHẬT: Truyền thêm actionDef.schema xuống cho compiler
+        on: (selector, eventName, actionDef, extractMap = {}) => {
             compiler.bindEvent(selector, eventName, actionDef.actionId, extractMap, actionDef.schema);
         },
 
@@ -490,7 +489,7 @@ export const blueprint = (componentName, setupFn) => {
                                 g.bindClass(selector, className, signal);
                             } else if (attr.startsWith('x-on:')) {
                                 const eventName = attr.split(':')[1];
-                                g.on(selector, eventName, signal);
+                                g.on(selector, eventName, signal, {});
                             }
 
                             // Xóa thuộc tính x-* đi để xuất ra HTML sạch sẽ, chuẩn SEO

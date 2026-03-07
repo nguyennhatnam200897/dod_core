@@ -22,11 +22,11 @@ const ShopCard = blueprint('ShopCard', (g) => {
 
     // 🌟 RUST FLOAT MATH: Tính % tiến trình Hài lòng
     const goodRatio = g.div(g.cast(goodReviews, g.f64), g.cast(totalReviews, g.f64));
-    const goodRatioPercent = g.mul(goodRatio, 100.0);
+    const goodRatioPercent = g.mul(goodRatio, g.cast(100, g.f64));
 
-    // Rẽ nhánh trạng thái Huy hiệu (Badge)
-    const isTrusted = g.gte(trustScore, 8.0);
-    const isWarning = g.lt(trustScore, 5.0);
+    // 🌟 2. SỬA 2 DÒNG NÀY: Ép kiểu 8.0 và 5.0 thành F64 để so sánh với trustScore
+    const isTrusted = g.gte(trustScore, g.cast(8, g.f64));
+    const isWarning = g.lt(trustScore, g.cast(5, g.f64));
     const isNormal = g.and(g.not(isTrusted), g.not(isWarning));
     
     // Cảnh báo nếu số review 1 sao chiếm > 20% (badReviews * 5 > totalReviews)
@@ -42,7 +42,9 @@ const ShopCard = blueprint('ShopCard', (g) => {
 
     // BINDING AST HTML
     const compiledHtml = g.parseTemplateFile('./templates/shop-card.html', {
-        isVisible, offsetY, shopName, 
+        isVisible, 
+        offsetY: props.offsetY, // 🌟 SỬA Ở ĐÂY: Phải gọi qua props.offsetY
+        shopName, 
         trustScoreText: [trustScore], 
         totalReviewsText: [totalReviews],
         isTrusted, isWarning, isNormal, hasManyBadReviews, isTopTier,
