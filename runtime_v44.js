@@ -494,6 +494,8 @@ export function hydrate(root, fingerprint, domArray, cacheArray) {
         
         if (cacheArray) cacheArray[target.idx] = null;
     };
+    
+    return dynamicNodes; // BẮT BUỘC TRẢ VỀ ĐỂ DÙNG CHUNG
 }
 
 // 🔌 UNPLUG: Đóng băng Logic và Ẩn Giao diện (Rút điện)
@@ -593,27 +595,29 @@ function initGlobalDelegation(eventName) {
 }
 
 // 3. Hàm đóng dấu DOM lúc Hydrate (Không gắn Listener nữa)
-export function bindEvents(root, EVENTS, mbId) {
-    // Đóng dấu thẻ root để Trạm gác biết DOM này thuộc về cỗ máy nào
+export function bindEvents(root, EVENTS, mbId, dynamicNodes = []) {
     if (root && root.setAttribute) {
         root.setAttribute('data-mb-id', mbId);
     }
 
     EVENTS.forEach(def => {
-        // Bật trạm gác cho loại sự kiện này (chỉ chạy 1 lần duy nhất cho toàn app)
         initGlobalDelegation(def.eventName);
         
-        // Tìm các phần tử đích và đóng mộc x-* lên chúng
         let elements = [];
-        if (root.matches && root.matches(def.selector)) elements.push(root);
-        const children = root.querySelectorAll(def.selector);
-        for(let i=0; i<children.length; i++) elements.push(children[i]);
+        
+        // Nhận diện nếu AST Parser trả về số nguyên
+        if (typeof def.selector === 'number') {
+            if (dynamicNodes[def.selector]) elements.push(dynamicNodes[def.selector]);
+        } 
+        // Logic cũ cho các string selector
+        else {
+            if (root.matches && root.matches(def.selector)) elements.push(root);
+            const children = root.querySelectorAll(def.selector);
+            for(let i=0; i<children.length; i++) elements.push(children[i]);
+        }
 
         elements.forEach(el => {
-            // Cú pháp x-* cực kỳ thân thiện với HTML
             el.setAttribute(`x-${def.eventName}`, def.actionName);
-            
-            // Lưu lại cách trích xuất dữ liệu
             if (def.inputs && def.inputs.length > 0) {
                 el.setAttribute('x-inputs', JSON.stringify(def.inputs));
             }

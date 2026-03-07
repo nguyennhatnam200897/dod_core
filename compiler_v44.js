@@ -949,14 +949,17 @@ const create${componentName} = (() => {
         U8.set([${initData.U8}]);
         GRAPH.set([${this.graphData.join(',')}]);
 
-        hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
+        // Bắt lấy mảng DOM
+        const dynamicNodes = hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
 
         Object.assign(actions, {
             ${actionsCode}
         });
 
         const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, ${exportedActionsCode}, actions, ${isActiveIndex});
-        bindEvents(root, EVENTS, _mbId);
+        
+        // Truyền mảng DOM vào
+        bindEvents(root, EVENTS, _mbId, dynamicNodes);
 
         for (let i = 0; i < COUNTS.totalNodes; i++) {
             const flagIdx = i >>> 5; const flagBit = 31 - (i & 31);

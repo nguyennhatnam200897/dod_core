@@ -480,6 +480,8 @@ export const blueprint = (componentName, setupFn) => {
                                 g.bindShow(selector, signal, 'block');
                             } else if (attr === 'x-model') {
                                 g.bindInput(selector, signal);
+                            } else if (attr === 'x-transform-y') { // 🌟 THÊM DÒNG NÀY
+                                g.bindTransformY(selector, signal);
                             } else if (attr.startsWith('x-bind:')) {
                                 const targetAttr = attr.split(':')[1];
                                 g.bindAttr(selector, targetAttr, signal);
