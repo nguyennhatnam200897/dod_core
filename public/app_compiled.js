@@ -1,140 +1,5 @@
 import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from '../runtime_v44.js';
 
-// --- COMPONENT: PlatformManager ---
-const createPlatformManager = (() => {
-    const COUNTS = {"f64":3,"i32":0,"u8":1,"sinks":2,"totalNodes":5,"graphSize":0};
-    const FINGERPRINT = [{"idx":0,"type":"VALUE","selector":"#score-slider"},{"idx":1,"type":"TEXT","selector":"#min-score-lbl"}];
-    const LUT = [""];
-    const EVENTS = [{"selector":"#score-slider","eventName":"input","actionName":"act_0","inputs":[{"path":["value"],"expectedType":"F64"}]},{"selector":"#score-slider","eventName":"input","actionName":"act_2","inputs":[{"path":["value"],"expectedType":"F64"}]}];
-    const SINKS = [1,2];
-
-    // Các hàm tính toán c_exec_x được giữ lại dưới dạng "dự phòng", 
-    // trong thực tế khi chạy WASM, mảng này không còn được đụng tới nữa.
-    const c_exec_0 = null;
-    const r_exec_0 = (mem, mask) => { 
- const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
-let v=0, _res=0;
- 
- if (mask & 1073741824) { const val = String(F64[0]);
-if (CACHE[0] !== val) { 
-  // CHỈ GHI ĐÈ NẾU DOM THỰC SỰ KHÁC BIỆT (Tránh chớp nháy input)
-  if (DOM[0].value !== val) {
-    const active = document.activeElement === DOM[0];
-    let start = 0, end = 0;
-    // BƯỚC 1: Lưu vị trí con trỏ nếu user đang gõ
-    if (active) { start = DOM[0].selectionStart; end = DOM[0].selectionEnd; }
-    
-    DOM[0].value = val;
-    
-    // BƯỚC 2: Trả con trỏ về vị trí cũ
-    if (active) DOM[0].setSelectionRange(start, end);
-  }
-  CACHE[0] = val; 
-} } 
-if (mask & 536870912) { 
-                    const textVal = String(F64[0]);
-                    if (CACHE[1] !== textVal) { 
-                        if (CACHE[1] === null) {
-                            if (DOM[1].textContent !== String(textVal)) DOM[1].textContent = textVal;
-                        } else {
-                            DOM[1].textContent = textVal;
-                        }
-                        CACHE[1] = textVal; 
-                    }
-                 } 
- };
-
-    const BATCHES_C = [
-c_exec_0
-];
-    const BATCHES_R = [
-r_exec_0
-];
-
-    const EXPORTED_PORTS = {
-};
-
-    return function(root, actions = {}, instanceId = "") {
-        const finalName = instanceId !== "" ? "PlatformManager_" + instanceId : "PlatformManager";
-        
-        const mem = allocMemory(COUNTS, "PlatformManager");
-        const { F64, I32, U8, DOM, CACHE, GRAPH, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R } = mem; 
-        
-        F64.set([0,0,0]); 
-        I32.set([]); 
-        U8.set([1]);
-        GRAPH.set([]);
-
-        // Bắt lấy mảng DOM
-        const dynamicNodes = hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
-
-        Object.assign(actions, {
-            act_0: (newVal) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-F64[1] = newVal;
-const _tempVal_0 = F64[1];
-F64[0] = +_tempVal_0;
-FLAGS_R[0] |= 1073741824; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[0] |= 536870912; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); },
-    act_1: () => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-Motherboard.initVirtualScroll("ShopCard", "#shop-grid", window.DB.ID, 180, (instanceMbId, rowData, rowIndex) => {
-  Motherboard.sendSignal(instanceMbId, "ROW_INDEX", rowIndex);
-});
-Motherboard.wakeUp(); },
-    act_2: (newVal) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-F64[2] = newVal;
-const _disp_0_arg_0 = F64[2];
-const _tempVal_0 = F64[2];
-F64[0] = +_tempVal_0;
-FLAGS_R[0] |= 1073741824; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[0] |= 536870912; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; if (typeof window["broadcastMinScore"] === 'function') window["broadcastMinScore"](_disp_0_arg_0);
-Motherboard.wakeUp(); }
-        });
-
-        const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, {}, actions, 0);
-        
-        // Truyền mảng DOM vào
-        bindEvents(root, EVENTS, _mbId, dynamicNodes);
-
-        for (let i = 0; i < COUNTS.totalNodes; i++) {
-            const flagIdx = i >>> 5; const flagBit = 31 - (i & 31);
-            const l2Idx = flagIdx >>> 5; const l2Bit = 31 - (flagIdx & 31);
-            const l1Idx = l2Idx >>> 5; const l1Bit = 31 - (l2Idx & 31);
-            FLAGS_C[flagIdx] |= (1 << flagBit); L2_C[l2Idx] |= (1 << l2Bit); L1_C[l1Idx] |= (1 << l1Bit);
-            FLAGS_R[flagIdx] |= (1 << flagBit); L2_R[l2Idx] |= (1 << l2Bit); L1_R[l1Idx] |= (1 << l1Bit);
-        }
-        Motherboard.enqueue(_mbId);
-        Motherboard.wakeUp();
-
-        const STR_INDICES = [];
-
-        setTimeout(() => {
-            actions.act_1();
-            Motherboard.enqueue(_mbId);
-            Motherboard.wakeUp();
-        }, 0);
-
-        return {
-            plug: () => plug(root, mem, 0, FLAGS_R, L2_R, L1_R, SINKS),
-            unplug: () => { unplug(root, mem, 0); },
-            detach: () => {
-                unplug(root, mem, 0);
-                root.__parent = root.parentNode; root.__nextSibling = root.nextSibling;
-                if (root.parentNode) root.remove(); 
-            },
-            restore: () => {
-                if (root.__parent) root.__parent.insertBefore(root, root.__nextSibling); 
-                plug(root, mem, 0, FLAGS_R, L2_R, L1_R, SINKS); 
-            },
-            recycle: () => {
-                unplug(root, mem, 0); 
-                for (let i = 0; i < STR_INDICES.length; i++) {
-                    const strId = mem.I32[STR_INDICES[i]];
-                    if (strId < 0) { releaseDynamicString(strId); mem.I32[STR_INDICES[i]] = 0; }
-                }
-            },
-            _mbId, _poolId: instanceId !== "" ? instanceId : -1, _name: finalName, _dataIndex: -2, _rootNode: root
-        };
-    }
-})();
-
 // --- COMPONENT: ShopCard ---
 const createShopCard = (() => {
     const COUNTS = {"f64":9,"i32":25,"u8":1,"sinks":17,"totalNodes":51,"graphSize":4};
@@ -447,20 +312,149 @@ Motherboard.wakeUp(); }
     }
 })();
 
-// --- KHỞI CHẠY HỆ THỐNG ---
+// --- COMPONENT: PlatformManager ---
+const createPlatformManager = (() => {
+    const COUNTS = {"f64":3,"i32":0,"u8":1,"sinks":2,"totalNodes":5,"graphSize":0};
+    const FINGERPRINT = [{"idx":0,"type":"VALUE","selector":"#score-slider"},{"idx":1,"type":"TEXT","selector":"#min-score-lbl"}];
+    const LUT = [""];
+    const EVENTS = [{"selector":"#score-slider","eventName":"input","actionName":"act_0","inputs":[{"path":["value"],"expectedType":"F64"}]},{"selector":"#score-slider","eventName":"input","actionName":"act_2","inputs":[{"path":["value"],"expectedType":"F64"}]}];
+    const SINKS = [1,2];
+
+    // Các hàm tính toán c_exec_x được giữ lại dưới dạng "dự phòng", 
+    // trong thực tế khi chạy WASM, mảng này không còn được đụng tới nữa.
+    const c_exec_0 = null;
+    const r_exec_0 = (mem, mask) => { 
+ const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
+let v=0, _res=0;
+ 
+ if (mask & 1073741824) { const val = String(F64[0]);
+if (CACHE[0] !== val) { 
+  // CHỈ GHI ĐÈ NẾU DOM THỰC SỰ KHÁC BIỆT (Tránh chớp nháy input)
+  if (DOM[0].value !== val) {
+    const active = document.activeElement === DOM[0];
+    let start = 0, end = 0;
+    // BƯỚC 1: Lưu vị trí con trỏ nếu user đang gõ
+    if (active) { start = DOM[0].selectionStart; end = DOM[0].selectionEnd; }
+    
+    DOM[0].value = val;
+    
+    // BƯỚC 2: Trả con trỏ về vị trí cũ
+    if (active) DOM[0].setSelectionRange(start, end);
+  }
+  CACHE[0] = val; 
+} } 
+if (mask & 536870912) { 
+                    const textVal = String(F64[0]);
+                    if (CACHE[1] !== textVal) { 
+                        if (CACHE[1] === null) {
+                            if (DOM[1].textContent !== String(textVal)) DOM[1].textContent = textVal;
+                        } else {
+                            DOM[1].textContent = textVal;
+                        }
+                        CACHE[1] = textVal; 
+                    }
+                 } 
+ };
+
+    const BATCHES_C = [
+c_exec_0
+];
+    const BATCHES_R = [
+r_exec_0
+];
+
+    const EXPORTED_PORTS = {
+};
+
+    return function(root, actions = {}, instanceId = "") {
+        const finalName = instanceId !== "" ? "PlatformManager_" + instanceId : "PlatformManager";
+        
+        const mem = allocMemory(COUNTS, "PlatformManager");
+        const { F64, I32, U8, DOM, CACHE, GRAPH, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R } = mem; 
+        
+        F64.set([0,0,0]); 
+        I32.set([]); 
+        U8.set([1]);
+        GRAPH.set([]);
+
+        // Bắt lấy mảng DOM
+        const dynamicNodes = hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
+
+        Object.assign(actions, {
+            act_0: (newVal) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
+F64[1] = newVal;
+const _tempVal_0 = F64[1];
+F64[0] = +_tempVal_0;
+FLAGS_R[0] |= 1073741824; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[0] |= 536870912; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); },
+    act_1: () => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
+Motherboard.initVirtualScroll("ShopCard", "#shop-grid", window.DB.ID, 180, (instanceMbId, rowData, rowIndex) => {
+  Motherboard.sendSignal(instanceMbId, "ROW_INDEX", rowIndex);
+});
+Motherboard.wakeUp(); },
+    act_2: (newVal) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
+F64[2] = newVal;
+const _disp_0_arg_0 = F64[2];
+const _tempVal_0 = F64[2];
+F64[0] = +_tempVal_0;
+FLAGS_R[0] |= 1073741824; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[0] |= 536870912; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; if (typeof window["broadcastMinScore"] === 'function') window["broadcastMinScore"](_disp_0_arg_0);
+Motherboard.wakeUp(); }
+        });
+
+        const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, {}, actions, 0);
+        
+        // Truyền mảng DOM vào
+        bindEvents(root, EVENTS, _mbId, dynamicNodes);
+
+        for (let i = 0; i < COUNTS.totalNodes; i++) {
+            const flagIdx = i >>> 5; const flagBit = 31 - (i & 31);
+            const l2Idx = flagIdx >>> 5; const l2Bit = 31 - (flagIdx & 31);
+            const l1Idx = l2Idx >>> 5; const l1Bit = 31 - (l2Idx & 31);
+            FLAGS_C[flagIdx] |= (1 << flagBit); L2_C[l2Idx] |= (1 << l2Bit); L1_C[l1Idx] |= (1 << l1Bit);
+            FLAGS_R[flagIdx] |= (1 << flagBit); L2_R[l2Idx] |= (1 << l2Bit); L1_R[l1Idx] |= (1 << l1Bit);
+        }
+        Motherboard.enqueue(_mbId);
+        Motherboard.wakeUp();
+
+        const STR_INDICES = [];
+
+        setTimeout(() => {
+            actions.act_1();
+            Motherboard.enqueue(_mbId);
+            Motherboard.wakeUp();
+        }, 0);
+
+        return {
+            plug: () => plug(root, mem, 0, FLAGS_R, L2_R, L1_R, SINKS),
+            unplug: () => { unplug(root, mem, 0); },
+            detach: () => {
+                unplug(root, mem, 0);
+                root.__parent = root.parentNode; root.__nextSibling = root.nextSibling;
+                if (root.parentNode) root.remove(); 
+            },
+            restore: () => {
+                if (root.__parent) root.__parent.insertBefore(root, root.__nextSibling); 
+                plug(root, mem, 0, FLAGS_R, L2_R, L1_R, SINKS); 
+            },
+            recycle: () => {
+                unplug(root, mem, 0); 
+                for (let i = 0; i < STR_INDICES.length; i++) {
+                    const strId = mem.I32[STR_INDICES[i]];
+                    if (strId < 0) { releaseDynamicString(strId); mem.I32[STR_INDICES[i]] = 0; }
+                }
+            },
+            _mbId, _poolId: instanceId !== "" ? instanceId : -1, _name: finalName, _dataIndex: -2, _rootNode: root
+        };
+    }
+})();
+
 async function startApp() {
     await bootEngineWasm();
-
     window.mountComponents = () => {
-        if (document.querySelector('body')) createPlatformManager(document.querySelector('body'));
-        if (document.querySelector('.shop-wrapper')) initObjectPool('ShopCard', createShopCard, '.shop-wrapper', 20);
+        if (document.querySelector('.dod-pool-shopcard-0')) initObjectPool('ShopCard', createShopCard, '.dod-pool-shopcard-0', 20);
+        if (document.querySelector('#dod-attach-platformmanager')) createPlatformManager(document.querySelector('#dod-attach-platformmanager'));
     };
-
     window.MB = Motherboard;
     window.DSTR = DYNAMIC_STR;
-    console.log("✅ Bo mạch chủ đã khởi động! Mọi Component đã sẵn sàng.");
     window.mountComponents();
-    Router.init('#app-root', window.mountComponents);
 }
-
 startApp();

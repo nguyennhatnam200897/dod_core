@@ -1,6 +1,5 @@
 import fs from 'fs';
 import { blueprint, buildApp, pool } from './framework_v44.js';
-import { parse } from 'node-html-parser';
 
 // =========================================
 // 1. COMPONENT THẺ SHOP (G2 CARD)

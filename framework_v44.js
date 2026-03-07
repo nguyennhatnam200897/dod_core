@@ -178,6 +178,8 @@ function resolve(val) {
 export const blueprint = (componentName, setupFn) => {
     compiler.reset();
 
+    let exportedHtml = "";
+
     const g = {
         i32: TYPE.I32,
         f64: TYPE.F64,
@@ -548,10 +550,11 @@ export const buildApp = (config) => {
     let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from '../runtime_v44.js';\n\n`;
     let combinedRustCode = `// 🚀 FILE TỰ ĐỘNG SINH BỞI ENGINE DOD\nuse super::MotherboardCore;\n\nimpl MotherboardCore {\n    pub fn execute_batch(&mut self, chunk_id: usize, mut mask: u32) {\n        match self.comp_name.as_str() {\n`;
 
-    // 1. QUÉT VÀ TIÊM SSG TỰ ĐỘNG BẰNG AST
+    // 1. QUÉT VÀ TIÊM SSG TỰ ĐỘNG BẰNG AST LAI (HYBRID)
     if (template && outHtml) {
         console.log("💉 Đang quét file Template và tự động nối dây Component...");
         const root = parse(fs.readFileSync(template, 'utf-8'));
+        const poolInjections = {}; // 🌟 BẢN VÁ: Kho chứa HTML để bơm bằng String sau khi AST chạy xong
 
         // Xử lý <dod-pool>
         root.querySelectorAll('dod-pool').forEach((el, index) => {
@@ -569,8 +572,14 @@ export const buildApp = (config) => {
             for(let i=0; i<size; i++) {
                 htmlStr += `<div class="${wrapperClass} ${poolSelector}">\n${comp.html}\n</div>\n`;
             }
-            el.replaceWith(htmlStr); // Đổi Custom Tag thành HTML thật
-            mountTargets[`.${poolSelector}`] = pool(comp, size); // Tự động ghi chú kết nối
+            
+            // 🌟 CHIẾN THUẬT MỚI: Tráo thẻ dod-pool bằng 1 cục nam châm (Marker)
+            const marker = ``;
+            el.replaceWith(marker);
+            
+            // Cất 20 thẻ HTML vào kho
+            poolInjections[marker] = htmlStr; 
+            mountTargets[`.${poolSelector}`] = pool(comp, size); 
         });
 
         // Xử lý dod-attach (Gắn Component vào một thẻ có sẵn)
@@ -579,15 +588,22 @@ export const buildApp = (config) => {
             const comp = compMap[compName];
             if (!comp) throw new Error(`[AST] Không tìm thấy Component '${compName}'`);
 
-            let selector = el.id ? `#${el.id}` : `dod-attach-${compName.toLowerCase()}`;
-            if (!el.id) el.classList.add(selector); // Cấp ID nếu chưa có
+            // Nếu thẻ chưa có id, tự động cấp 1 id cho nó
+            let selectorId = el.id ? el.id : `dod-attach-${compName.toLowerCase()}`;
+            if (!el.id) el.setAttribute('id', selectorId); 
             
-            mountTargets[el.id ? selector : `.${selector}`] = comp;
+            mountTargets[`#${selectorId}`] = comp;
             el.removeAttribute('dod-attach'); // Dọn dẹp SEO
         });
 
-        fs.writeFileSync(outHtml, root.toString());
-        console.log(`✅ Đã đúc thành công giao diện và loại bỏ Custom Tags!`);
+        // 🌟 BƯỚC QUYẾT ĐỊNH: Chuyển AST về chuỗi String, sau đó bơm 20 thẻ vào các cục nam châm
+        let finalOutputHtml = root.toString();
+        for (const marker in poolInjections) {
+            finalOutputHtml = finalOutputHtml.replace(marker, poolInjections[marker]);
+        }
+
+        fs.writeFileSync(outHtml, finalOutputHtml);
+        console.log(`✅ Đã đúc thành công giao diện và loại bỏ Custom Tags an toàn tuyệt đối!`);
     }
 
     // 2. SINH CODE RUST VÀ JS (Với tính năng Tree-Shaking: Chỉ sinh code cho Component có dùng)
