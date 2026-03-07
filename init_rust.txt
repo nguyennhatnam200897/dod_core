@@ -1,0 +1,7 @@
+// init rust
+cargo new --lib dod_core
+cd dod_core
+cargo add wasm-bindgen
+
+// pack rust
+wasm-pack build --target web

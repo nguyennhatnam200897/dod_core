@@ -1,0 +1,764 @@
+// runtime_v44.js
+import initWasm, { MotherboardCore } from './pkg/dod_core.js';
+// ==============================================================
+// 🌟 HÀNG ĐỢI MẢNG VÒNG (RING BUFFER) O(1) - ZERO ALLOCATION
+// ==============================================================
+const MAX_COMPONENTS = 65536; // Giới hạn 64.000 Component chạy cùng lúc (Sức mạnh C++)
+const QUEUE = new Int32Array(MAX_COMPONENTS);
+const IN_QUEUE = new Uint8Array(MAX_COMPONENTS);
+let qHead = 0;
+let qTail = 0;
+
+export const Motherboard = {
+    components: new Array(MAX_COMPONENTS),
+    nameToId: new Map(),
+    compCount: 0,
+    pools: {},
+    lazyRegistry: {}, // 🌟 THÊM MỚI: Sổ đăng ký Component lười biếng
+    isComputing: false,
+    isRenderScheduled: false,
+    
+    // 🌟 BẢN VÁ ROUTER: Rút phích cắm diện rộng để tránh rò rỉ bộ nhớ (Memory Leak)
+    unplugTree: (containerNode) => {
+        for (let i = 0; i < Motherboard.components.length; i++) {
+            const comp = Motherboard.components[i];
+            // Nếu Component đang sống và DOM của nó nằm trong vùng sắp bị xóa
+            if (comp && comp._rootNode && containerNode.contains(comp._rootNode)) {
+                if (comp.recycle) comp.recycle(); // Giải phóng chuỗi & Tắt cờ Rust
+                else if (comp.unplug) comp.unplug();
+                
+                Motherboard.components[i] = undefined; // Giải phóng RAM cho JS
+            }
+        }
+    },
+
+    // 🌟 THÊM MỚI: Khai báo Component nhưng chưa cấp phát RAM
+    registerLazy: (name, factoryFn, templateSelector, containerSelector) => {
+        Motherboard.lazyRegistry[name] = { factoryFn, templateSelector, containerSelector, isMounted: false };
+    },
+
+    // 🌟 THÊM MỚI: Lò ấp JIT (Nặn DOM và cắm điện ngay lúc được gọi)
+    _ensureMounted: (targetName) => {
+        const lazyInfo = Motherboard.lazyRegistry[targetName];
+        if (lazyInfo && !lazyInfo.isMounted) {
+            const template = document.querySelector(lazyInfo.templateSelector);
+            const container = document.querySelector(lazyInfo.containerSelector);
+            if (template && container) {
+                // 1. Nhân bản từ Template (Không tốn chi phí Parse HTML)
+                const clone = template.content.cloneNode(true);
+                const rootNode = clone.firstElementChild; 
+                container.appendChild(rootNode); // Bơm vào màn hình
+                
+                // 2. Cấp phát RAM và Cắm điện
+                lazyInfo.factoryFn(rootNode);
+                lazyInfo.isMounted = true;
+                console.log(`[Engine JIT] Đã khởi tạo lười biếng: ${targetName} ⚡`);
+            }
+        }
+    },
+
+    // 🌟 THÊM MỚI: API Ly Khai Trang (Dành cho Router)
+    detach: (targetName) => {
+        const id = Motherboard.nameToId.get(targetName);
+        if (id === undefined) return;
+        const comp = Motherboard.components[id];
+        // Gọi hàm detach đã được compiler sinh ra
+        if (comp && comp.actions && typeof comp.actions.detach === 'function') {
+            comp.actions.detach();
+        } else if (comp && typeof comp.detach === 'function') {
+            comp.detach(); // Dành cho instances
+        }
+    },
+
+    // 🌟 THÊM MỚI: API Phục Hồi Trang (Dành cho Router)
+    restore: (targetName) => {
+        const id = Motherboard.nameToId.get(targetName);
+        if (id === undefined) return;
+        const comp = Motherboard.components[id];
+        if (comp && comp.actions && typeof comp.actions.restore === 'function') {
+            comp.actions.restore();
+        } else if (comp && typeof comp.restore === 'function') {
+            comp.restore();
+        }
+    },
+
+    register: (name, mem, BATCHES_C, BATCHES_R, exportedNodeIds = {}, exportedActions = {}, actions = {}, isActiveIndex = 0) => {
+        // 🌟 Cấp cho mỗi Component một "Mã số định danh" (ID Nguyên thủy)
+        const id = Motherboard.compCount++;
+        const comp = { id, name, mem, BATCHES_C, BATCHES_R, nodes: exportedNodeIds, exportedActions, actions, isActiveIndex };
+        
+        Motherboard.components[id] = comp;
+        Motherboard.nameToId.set(name, id);
+        return id; // Trả về ID để Compiler sử dụng
+    },
+
+    // 🌟 THUẬT TOÁN ĐẨY VÀO HÀNG ĐỢI O(1)
+    enqueue: (id) => {
+        if (IN_QUEUE[id] === 0) {
+            IN_QUEUE[id] = 1;
+            QUEUE[qTail] = id;
+            // Phép thuật Bitwise: (X + 1) % 65536 cực nhanh
+            qTail = (qTail + 1) & 65535; 
+        }
+    },
+
+    callAction: (target, actionPortName, ...args) => {
+        if (typeof target === 'string') Motherboard._ensureMounted(target);
+        
+        const id = typeof target === 'string' ? Motherboard.nameToId.get(target) : target;
+        if (id === undefined) return;
+        const targetComp = Motherboard.components[id];
+        const actionId = targetComp.exportedActions[actionPortName];
+        
+        if (actionId && targetComp.actions[actionId]) {
+            targetComp.actions[actionId](...args);
+            // 🌟 BẢN VÁ 1: Đánh thức và xếp hàng Component nhận lệnh (Ví dụ: Cart, Popup)
+            Motherboard.enqueue(id);
+            Motherboard.wakeUp();
+        }
+    },
+    
+    // get: (name) => Motherboard.registry[name],
+
+    sendSignal: (target, portName, value) => {
+        // 🌟 BẢN VÁ: Đánh chặn truyền tín hiệu IPC
+        if (typeof target === 'string') Motherboard._ensureMounted(target);
+
+        const id = typeof target === 'string' ? Motherboard.nameToId.get(target) : target;
+        if (id === undefined) return;
+
+        const targetComp = Motherboard.components[id];
+        const port = targetComp.nodes[portName];
+        if (!port) return;
+
+        let tempPtr = value;
+
+        if (port.semantic === 'STR') {
+            if (typeof value === 'string') tempPtr = setDynamicString(value); 
+            else if (typeof value === 'number' && value < 0) tempPtr = retainDynamicString(value); 
+        } else {
+            tempPtr = (port.type === 'F64') ? Number(value) : (Number(value) | 0);
+            if (isNaN(tempPtr)) tempPtr = 0;
+        }
+
+        const memoryArray = targetComp.mem[port.type];
+        const oldValue = memoryArray[port.id];
+
+        if (oldValue !== tempPtr) {
+            if (port.semantic === 'STR' && oldValue < 0) releaseDynamicString(oldValue);
+            memoryArray[port.id] = tempPtr;
+            if (port.propagate) port.propagate(targetComp.mem);
+            
+            // 🌟 ĐẨY VÀO MẢNG VÒNG THAY VÌ SET
+            Motherboard.enqueue(id);
+            Motherboard.wakeUp();
+        } else {
+            if (port.semantic === 'STR' && tempPtr < 0) releaseDynamicString(tempPtr);
+        }
+    },
+
+
+    // --- THÊM MỚI: API Render Danh sách từ Object Pool ---
+    renderList: (poolName, dataArray, mappingFn) => {
+        const pool = Motherboard.pools[poolName];
+        if (!pool) {
+            console.error(`[Motherboard] Không tìm thấy Pool '${poolName}'`);
+            return;
+        }
+
+        const currentActive = pool.activeList.length;
+        const newTarget = dataArray.length;
+
+        // 1. Thu hồi các Component thừa (Nếu dữ liệu mới ít hơn số lượng đang hiển thị)
+        while (pool.activeList.length > newTarget) {
+            const instance = pool.activeList.pop();
+            instance.recycle(); // Dọn rác RAM, ẩn DOM
+            pool.freeList.push(instance); // Trả về kho
+        }
+
+        // 2. Cấp phát và Bắn dữ liệu
+        for (let i = 0; i < newTarget; i++) {
+            let instance;
+            // Nếu màn hình đang thiếu, rút từ Kho rảnh rỗi ra
+            if (i >= currentActive) {
+                if (pool.freeList.length === 0) {
+                    console.warn(`[Motherboard] Pool '${poolName}' đã cạn kiệt! (Sức chứa: ${pool.activeList.length}). Vui lòng tăng poolSize.`);
+                    break;
+                }
+                instance = pool.freeList.pop();
+                pool.activeList.push(instance);
+            } else {
+                // Tái sử dụng Component đang hiển thị sẵn trên màn hình
+                instance = pool.activeList[i];
+            }
+
+            // Gọi hàm mapping do Dev định nghĩa để bắn dòng điện
+            mappingFn(instance._name, dataArray[i], i);
+
+            // Bật điện, ép Render ra DOM ngay lập tức
+            instance.plug();
+        }
+        
+        console.log(`[Engine] Đã render xong ${newTarget} items cho Pool '${poolName}'. (Kho còn: ${pool.freeList.length})`);
+    },
+
+    // ==============================================================
+    // 🌟 THUẬT TOÁN THẤU KÍNH SSG (CÓ TỰ LÀM SẠCH KHI LỌC DATA) 🌟
+    // ==============================================================
+    initVirtualScroll: (poolName, containerSelector, dataArray, itemHeight, mappingFn) => {
+        const container = document.querySelector(containerSelector);
+        const pool = Motherboard.pools[poolName];
+        if (!container || !pool) return;
+
+        if (pool._isScrollBound) {
+            pool._updateData(dataArray);
+            return;
+        }
+        pool._isScrollBound = true;
+
+        const spacer = container.querySelector('.virtual-spacer');
+        if (!spacer) return;
+
+        container.style.overflowY = 'auto';
+        container.style.position = 'relative';
+        container.style.willChange = 'transform';
+
+        let currentData = dataArray;
+        let lastStartIdx = -1;
+
+        const renderFrame = (force = false) => {
+            spacer.style.height = `${currentData.length * itemHeight}px`;
+
+            const scrollTop = container.scrollTop;
+            const viewportHeight = container.clientHeight;
+
+            // 🌟 TỐI ƯU 1: THUẬT TOÁN OVERSCAN (Tận dụng 100% Cỗ máy trong Pool)
+            const visibleCount = Math.ceil(viewportHeight / itemHeight); 
+            // Dàn đều số item dư thừa trong Pool lên trên và xuống dưới vùng nhìn thấy
+            const overscan = Math.max(0, Math.floor((pool.poolSize - visibleCount) / 2)); 
+
+            let startIdx = Math.floor(scrollTop / itemHeight) - overscan;
+            if (startIdx < 0) startIdx = 0;
+
+            let endIdx = Math.min(currentData.length - 1, startIdx + pool.poolSize - 1);
+            
+            // Ép startIdx lùi lại nếu scroll chạm đáy để luôn xài hết 100% sức mạnh của Pool
+            startIdx = Math.max(0, endIdx - pool.poolSize + 1);
+
+            if (!force && startIdx === lastStartIdx) return;
+            lastStartIdx = startIdx;
+
+            // BƯỚC 1: ĐỊNH TUYẾN DỮ LIỆU
+            let usedCount = 0;
+            for (let i = startIdx; i <= endIdx; i++) {
+                if (i < 0 || i >= currentData.length) continue;
+                
+                const physicalIdx = i % pool.poolSize; 
+                const inst = pool.instances[physicalIdx];
+                usedCount++;
+                
+                if (inst._dataIndex !== i) {
+                    inst._dataIndex = i;
+                    // TRUYỀN THÊM rowIndex VÀO MAPPING NHƯ BẠN ĐÃ CẬP NHẬT Ở BƯỚC TRƯỚC
+                    mappingFn(inst._mbId, currentData[i], i);
+                    Motherboard.sendSignal(inst._mbId, 'TRANSFORM_Y', i * itemHeight);
+                }
+            }
+
+            // BƯỚC 2: Dọn dẹp (Chỉ kích hoạt khi Data có ít hơn số lượng thẻ trong Pool)
+            const orphanCount = pool.poolSize - usedCount;
+            if (orphanCount > 0) {
+                let orphanIdx = (endIdx + 1) % pool.poolSize;
+                for (let k = 0; k < orphanCount; k++) {
+                    const inst = pool.instances[orphanIdx];
+                    if (inst._dataIndex !== -1) {
+                         Motherboard.sendSignal(inst._mbId, 'TRANSFORM_Y', -99999);
+                         inst._dataIndex = -1; 
+                    }
+                    orphanIdx = (orphanIdx + 1) % pool.poolSize;
+                }
+            }
+        };
+
+        pool._updateData = (newData) => {
+            currentData = newData;
+            container.scrollTop = 0; 
+            renderFrame(true);       
+        };
+
+        // 🌟 TỐI ƯU 2: Bỏ requestAnimationFrame bao bọc bên ngoài!
+        // Vì bên trong Motherboard đã có rAF ở pipeline RENDER rồi, bọc ở đây sẽ làm trễ 1 khung hình.
+        // Dùng thêm { passive: true } để trình duyệt tăng tốc luồng cuộn GPU.
+        container.addEventListener('scroll', () => renderFrame(false), { passive: true });
+        renderFrame(true); 
+    },
+
+
+    // Đánh thức luồng tính toán
+    wakeUp: () => {
+        if (!Motherboard.isComputing) {
+            Motherboard.isComputing = true;
+            queueMicrotask(() => Motherboard.tickCompute());
+        }
+    },
+
+    // Chỉ chạy BATCHES_C (Logic & Toán học)
+    tickCompute: () => {
+        Motherboard.isComputing = true;
+
+        while (qHead !== qTail) {
+            const id = QUEUE[qHead];
+            qHead = (qHead + 1) & 65535; 
+            IN_QUEUE[id] = 0;            
+
+            const comp = Motherboard.components[id];
+            if (!comp || comp.mem.U8[comp.isActiveIndex] === 0) continue;
+
+            // 🌟 1. BÁN CẦU TRÁI (JS): Chạy để đọc window.DB (globalRead)
+            // keepFlags = true để giữ nguyên Cờ cho Rust
+            runDispatch(comp.mem, comp.mem.L1_C, comp.mem.L2_C, comp.mem.FLAGS_C, comp.BATCHES_C, true);
+
+            // 🌟 2. BÁN CẦU PHẢI (Rust): Chạy toán học và tự động dọn dẹp Cờ (Clear Flags)
+            comp.mem._rustCore.tick_compute();
+        }
+
+        Motherboard.isComputing = false;
+
+        if (!Motherboard.isRenderScheduled) {
+            Motherboard.isRenderScheduled = true;
+            requestAnimationFrame(() => Motherboard.tickRender());
+        }
+    },
+
+    // Chỉ chạy BATCHES_R (Cập nhật DOM)
+    tickRender: () => {
+        const len = Motherboard.compCount;
+        for (let i = 0; i < len; i++) {
+            const comp = Motherboard.components[i];
+            if (!comp || comp.mem.U8[comp.isActiveIndex] === 0) continue;
+            
+            let compDirty = false;
+            for (let j = 0; j < comp.mem.L1_R.length; j++) { 
+                if (comp.mem.L1_R[j] !== 0) { compDirty = true; break; } 
+            }
+            if (compDirty) runDispatch(comp.mem, comp.mem.L1_R, comp.mem.L2_R, comp.mem.FLAGS_R, comp.BATCHES_R);
+        }
+        Motherboard.isRenderScheduled = false;
+    }
+};
+
+export const DYNAMIC_STR = [];       // Lưu chuỗi thật
+const REF_COUNTS = [];               // Mảng đếm tham chiếu
+const FREE_LIST = [];                // Mảng chứa các index rảnh rỗi
+const STR_MAP = new Map();           // O(1) Lookup (String Interning)
+
+// RETAIN (Cấp phát hoặc Tăng tham chiếu)
+export function setDynamicString(str) {
+    if (typeof str !== 'string') return str; 
+    
+    let idx;
+    if (STR_MAP.has(str)) {
+        // Tái sử dụng: Chuỗi đã tồn tại
+        idx = STR_MAP.get(str);
+        REF_COUNTS[idx]++; 
+    } else {
+        // Cấp phát mới
+        if (FREE_LIST.length > 0) {
+            idx = FREE_LIST.pop(); // Lấy chỗ trống cũ
+        } else {
+            idx = DYNAMIC_STR.length; // Mở rộng Pool
+            REF_COUNTS.push(0); 
+        }
+        
+        DYNAMIC_STR[idx] = str;
+        STR_MAP.set(str, idx);
+        REF_COUNTS[idx] = 1;
+    }
+    
+    return -(idx + 1); // Trả về ID âm
+}
+
+// RETAIN (Tăng tham chiếu khi một Node "mượn" chuỗi từ Node khác)
+export function retainDynamicString(id) {
+    if (id >= 0) return id; // Bỏ qua nếu là số thường hoặc chuỗi tĩnh (LUT)
+    
+    const idx = -(id) - 1;
+    
+    if (idx >= 0 && idx < DYNAMIC_STR.length && DYNAMIC_STR[idx] !== null) {
+        REF_COUNTS[idx]++; // Tăng bộ đếm an toàn
+    }
+    return id;
+}
+
+// RELEASE (Giải phóng bộ nhớ)
+export function releaseDynamicString(id) {
+    if (id >= 0) return; // Bỏ qua nếu là chuỗi tĩnh (LUT) hoặc số thường
+    
+    const idx = -(id) - 1;
+    
+    if (idx >= 0 && idx < DYNAMIC_STR.length && DYNAMIC_STR[idx] !== null) {
+        REF_COUNTS[idx]--;
+        
+        // Garbage Collection: Đã hết Node dùng chuỗi này
+        if (REF_COUNTS[idx] === 0) {
+            STR_MAP.delete(DYNAMIC_STR[idx]); // Xóa khỏi Map
+            DYNAMIC_STR[idx] = null;          // Giải phóng RAM cho Garbage Collector của JS
+            FREE_LIST.push(idx);              // Đưa index vào danh sách chờ tái sử dụng
+        }
+    }
+}
+
+// Khai báo biến toàn cục lưu trữ WASM
+let wasmModule = null;
+let core = null;
+
+export async function bootEngineWasm() {
+    // 1. Tải lõi Rust/WASM
+    wasmModule = await initWasm();
+    console.log("🚀 Lõi C++/Rust đã được kích hoạt!");
+}
+
+// 2. Viết lại hàm allocMemory (Cướp quyền quản lý RAM)
+// 🌟 THÊM THAM SỐ compName
+export function allocMemory(counts, compName) {
+    if (!wasmModule) throw new Error("Chưa khởi động WASM Engine!");
+
+    const core = new MotherboardCore(compName, counts.f64, counts.i32, counts.u8, counts.totalNodes);
+    const memory = wasmModule.memory.buffer;
+
+    return {
+        // 🌟 BẢN VÁ: Lưu lại con trỏ Rust của riêng Component này
+        _rustCore: core, 
+        
+        F64: new Float64Array(memory, core.ptr_f64(), counts.f64),
+        I32: new Int32Array(memory, core.ptr_i32(), counts.i32),
+        U8:  new Uint8Array(memory, core.ptr_u8(), counts.u8),
+        
+        FLAGS_C: new Uint32Array(memory, core.ptr_flags_c(), Math.ceil(counts.totalNodes/32)),
+        L2_C:    new Uint32Array(memory, core.ptr_l2_c(), Math.ceil(counts.totalNodes/1024)),
+        L1_C:    new Uint32Array(memory, core.ptr_l1_c(), Math.ceil(counts.totalNodes/32768)),
+        
+        FLAGS_R: new Uint32Array(memory, core.ptr_flags_r(), Math.ceil(counts.totalNodes/32)),
+        L2_R:    new Uint32Array(memory, core.ptr_l2_r(), Math.ceil(counts.totalNodes/1024)),
+        L1_R:    new Uint32Array(memory, core.ptr_l1_r(), Math.ceil(counts.totalNodes/32768)),
+        
+        GRAPH:   new Int32Array(counts.graphSize),
+        DOM: [], CACHE: []
+    };
+}
+
+// Cập nhật hàm hydrate (Kết hợp DOM giả ngay từ đầu nếu thiếu)
+export function hydrate(root, fingerprint, domArray, cacheArray) {
+
+    // 🌟 1. VÉT DOM O(1) CHÍNH XÁC TUYỆT ĐỐI
+    // Mảng chứa các thẻ động, được xếp đúng theo số thứ tự d="0", d="1"...
+    const dynamicNodes = [];
+    
+    // Kiểm tra xem chính thẻ bọc ngoài cùng (root) có điện không
+    if (root.hasAttribute && root.hasAttribute('d')) {
+        dynamicNodes[root.getAttribute('d')] = root;
+    }
+    
+    // Kiểm tra tất cả thẻ con bên trong
+    const children = root.querySelectorAll('[d]');
+    for (let i = 0; i < children.length; i++) {
+        const el = children[i];
+        dynamicNodes[el.getAttribute('d')] = el;
+    }
+
+    // 🌟 2. XÓA SẠCH DẤU VẾT BẢO MẬT (Tự hủy)
+    for (let i = 0; i < dynamicNodes.length; i++) {
+        if (dynamicNodes[i]) {
+            dynamicNodes[i].removeAttribute('d');
+        }
+    }
+
+    // 🌟 3. HYDRATE SIÊU TỐC VỚI ARRAY[INDEX] O(1)
+    for (let i = 0; i < fingerprint.length; i++) {
+        const target = fingerprint[i];
+        
+        // Truy xuất mảng trực tiếp bằng index (target.selector bây giờ là con số)
+        const node = dynamicNodes[target.selector]; 
+        
+        if (node) {
+            // PLUGGED: Gắn bộ nhớ RAM vào thẻ DOM
+            if (target.type === 'TEXT') {
+                if (node.childNodes.length === 0) node.appendChild(document.createTextNode(''));
+                domArray[target.idx] = node.firstChild;
+            } else {
+                domArray[target.idx] = node;
+            }
+        } else {
+            console.error(`[Headless] Unplugged from start at index: ${target.selector}`);
+        }
+        
+        if (cacheArray) cacheArray[target.idx] = null;
+    };
+}
+
+// 🔌 UNPLUG: Đóng băng Logic và Ẩn Giao diện (Rút điện)
+export function unplug(root, mem, isActiveIndex) {
+    // 1. Ngắt cầu dao Logic: Ghi số 0 vào bộ nhớ
+    // Motherboard sẽ đọc byte này và bỏ qua toàn bộ tính toán cho Component
+    mem.U8[isActiveIndex] = 0;
+
+    // 2. Ẩn DOM: Trình duyệt ngừng Layout/Paint cho vùng này
+    // Chú ý: DOM vẫn nằm đó, không hề bị xóa đi.
+    root.style.display = 'none';
+}
+
+// ⚡ PLUG: Thức tỉnh Logic, Hiện Giao diện và Ép Đồng bộ (Cắm điện)
+export function plug(root, mem, isActiveIndex, FLAGS_R, L2_R, L1_R, SINKS) {
+    // 1. Bật lại cầu dao Logic: Ghi số 1 vào bộ nhớ
+    mem.U8[isActiveIndex] = 1;
+
+    // 2. Hiển thị lại DOM
+    root.style.display = ''; 
+
+    // 3. Ép bật Bitmask cho toàn bộ Sinks (Render Nodes)
+    // Cực kỳ quan trọng: Trong lúc Component ngủ, dữ liệu có thể đã đổi.
+    // Việc bật cờ này sẽ ép Engine xả dữ liệu mới nhất từ RAM ra DOM thật.
+    for (let i = 0; i < SINKS.length; i++) {
+        const idx = SINKS[i];
+        const flagIdx = idx >>> 5;
+        const flagBit = 31 - (idx & 31);
+        const l2Idx = flagIdx >>> 5;
+        const l2Bit = 31 - (flagIdx & 31);
+        const l1Idx = l2Idx >>> 5;
+        const l1Bit = 31 - (l2Idx & 31);
+        
+        FLAGS_R[flagIdx] |= (1 << flagBit);
+        L2_R[l2Idx] |= (1 << l2Bit);
+        L1_R[l1Idx] |= (1 << l1Bit);
+    }
+
+    // 4. Kích hoạt Motherboard chạy (phòng khi Engine đang ngủ đông toàn cục)
+    Motherboard.wakeUp();
+}
+
+// 1. Sổ đăng ký sự kiện toàn cục (Tránh gắn trùng lặp)
+const globalEventRegistry = new Set();
+
+// 2. Trạm gác sự kiện ở cấp độ Body
+function initGlobalDelegation(eventName) {
+    if (globalEventRegistry.has(eventName)) return;
+    globalEventRegistry.add(eventName);
+
+    document.body.addEventListener(eventName, (e) => {
+        // Tìm ngược lên trên xem có thẻ nào chứa cú pháp x-* không (VD: x-click)
+        const targetEl = e.target.closest(`[x-${eventName}]`);
+        if (!targetEl) return;
+
+        // Đọc tên Action cần kích hoạt
+        const actionName = targetEl.getAttribute(`x-${eventName}`);
+        
+        // Tìm Component gốc đang chứa thẻ này
+        const componentRoot = targetEl.closest('[data-mb-id]');
+        if (!componentRoot) return;
+
+        // Rút ID của Component để truy xuất vào Motherboard
+        const mbId = componentRoot.getAttribute('data-mb-id');
+        const comp = Motherboard.components[mbId];
+
+        if (comp && comp.actions && comp.actions[actionName]) {
+            // Giải mã cấu hình đầu vào do Compiler chuẩn bị sẵn
+            const inputsRaw = targetEl.getAttribute('x-inputs');
+            const inputsConfig = inputsRaw ? JSON.parse(inputsRaw) : [];
+            
+            // Trích xuất dữ liệu từ Event (Ví dụ: e.target.value)
+            const args = inputsConfig.map(input => {
+                if (input.path) {
+                    let val = targetEl;
+                    for (let j = 0; j < input.path.length; j++) {
+                        if (val) val = val[input.path[j]];
+                    }
+                    
+                    if (input.expectedType === 'I32' || input.expectedType === 'F64') {
+                        const num = Number(val);
+                        return isNaN(num) ? 0 : num; // Bắt lỗi số học
+                    }
+                    return val;
+                }
+                return input.value; // Trả về giá trị tĩnh nếu có
+            });
+
+            // Bắn tín hiệu vào Action của đúng Component đó
+            comp.actions[actionName](...args, e);
+            
+            // 🌟 BẢN VÁ 2: Đánh thức và xếp hàng Component phát lệnh (Ví dụ: ProductItem)
+            Motherboard.enqueue(mbId);
+            Motherboard.wakeUp();
+        }
+    });
+}
+
+// 3. Hàm đóng dấu DOM lúc Hydrate (Không gắn Listener nữa)
+export function bindEvents(root, EVENTS, mbId) {
+    // Đóng dấu thẻ root để Trạm gác biết DOM này thuộc về cỗ máy nào
+    if (root && root.setAttribute) {
+        root.setAttribute('data-mb-id', mbId);
+    }
+
+    EVENTS.forEach(def => {
+        // Bật trạm gác cho loại sự kiện này (chỉ chạy 1 lần duy nhất cho toàn app)
+        initGlobalDelegation(def.eventName);
+        
+        // Tìm các phần tử đích và đóng mộc x-* lên chúng
+        let elements = [];
+        if (root.matches && root.matches(def.selector)) elements.push(root);
+        const children = root.querySelectorAll(def.selector);
+        for(let i=0; i<children.length; i++) elements.push(children[i]);
+
+        elements.forEach(el => {
+            // Cú pháp x-* cực kỳ thân thiện với HTML
+            el.setAttribute(`x-${def.eventName}`, def.actionName);
+            
+            // Lưu lại cách trích xuất dữ liệu
+            if (def.inputs && def.inputs.length > 0) {
+                el.setAttribute('x-inputs', JSON.stringify(def.inputs));
+            }
+        });
+    });
+}
+
+export function markBatch(FLAGS, L2, L1, GRAPH, start, end) {
+    for (let i = start; i < end; i++) {
+        const nodeIdx = GRAPH[i];
+        const flagIdx = nodeIdx >>> 5;
+        const flagBit = 31 - (nodeIdx & 31);
+        const l2Idx = flagIdx >>> 5;
+        const l2Bit = 31 - (flagIdx & 31);
+        const l1Idx = l2Idx >>> 5;
+        const l1Bit = 31 - (l2Idx & 31);
+        
+        FLAGS[flagIdx] |= (1 << flagBit);
+        L2[l2Idx] |= (1 << l2Bit);
+        L1[l1Idx] |= (1 << l1Bit);
+    }
+}
+
+export function runDispatch(mem, L1, L2, FLAGS, BATCHES, keepFlags = false) {
+    const len = L1.length;
+    for (let i = 0; i < len; i++) {
+        let maskL1 = L1[i];
+        if (maskL1 === 0) continue;
+        if (!keepFlags) L1[i] = 0; // 🌟 CHỈ XÓA NẾU KHÔNG GIỮ CỜ
+
+        while (maskL1 !== 0) {
+            const offsetL1 = Math.clz32(maskL1); 
+            maskL1 &= ~(1 << (31 - offsetL1));   
+            const l2Idx = (i << 5) + offsetL1;   
+            
+            let maskL2 = L2[l2Idx];
+            if (maskL2 === 0) continue;
+            if (!keepFlags) L2[l2Idx] = 0; // 🌟 CHỈ XÓA NẾU KHÔNG GIỮ CỜ
+
+            while (maskL2 !== 0) {
+                const offsetL2 = Math.clz32(maskL2);
+                maskL2 &= ~(1 << (31 - offsetL2));
+                const flagIdx = (l2Idx << 5) + offsetL2; 
+                
+                let maskFlags = FLAGS[flagIdx];
+                if (maskFlags === 0) continue;
+                if (!keepFlags) FLAGS[flagIdx] = 0; // 🌟 CHỈ XÓA NẾU KHÔNG GIỮ CỜ
+
+                const batchFn = BATCHES[flagIdx];
+                if (batchFn) batchFn(mem, maskFlags);
+            }
+        }
+    }
+}
+
+// ==============================================================
+// 🌟 KHỞI TẠO POOL (KỶ LUẬT THÉP - ZERO ALLOCATION) 🌟
+// ==============================================================
+export function initObjectPool(compName, factoryFn, containerSelector, poolSize) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    Motherboard.pools[compName] = {
+        instances: [],
+        poolSize,
+        _isScrollBound: false
+    };
+
+    const itemNodes = Array.from(container.children).filter(node => !node.classList.contains('virtual-spacer'));
+
+    if (itemNodes.length === 0) {
+        throw new Error(`[Engine Fatal] Server không render bất kỳ thẻ mẫu nào cho Component '${compName}'.`);
+    }
+
+    if (itemNodes.length > poolSize) {
+        throw new Error(`[SSG Violation] THẢM HỌA HIỆU NĂNG! Server gửi ${itemNodes.length} thẻ, vượt quá poolSize (${poolSize}).`);
+    }
+
+    // 🌟 BẢN VÁ B: CHẶT ĐỨT SỰ NƯƠNG TAY
+    // Không tự clone Node nữa. Bắt buộc Server phải xuất đủ số lượng Pool Size!
+    if (itemNodes.length < poolSize) {
+        throw new Error(`[SSG Fatal] Server gửi THIẾU HTML (Có ${itemNodes.length}, Cần ${poolSize}). Engine từ chối cấp phát DOM lúc Runtime để bảo vệ hiệu năng! Hãy sửa vòng lặp render trên Server!`);
+    }
+
+    for (let i = 0; i < poolSize; i++) {
+        let node = itemNodes[i];
+        
+        const instanceActions = {}; 
+        const instance = factoryFn(node, instanceActions, i); 
+
+        Motherboard.pools[compName].instances.push(instance);
+        instance.plug(); 
+    }
+    console.log(`[Engine] SSG Lens thiết lập thành công: [${poolSize} Cỗ máy Bất tử]`);
+}
+
+// ==============================================================
+// 🌟 TRÌNH ĐIỀU HƯỚNG SSG (SPA ROUTER)
+// ==============================================================
+export const Router = {
+    init: (containerSelector, mountCallback) => {
+        // Lắng nghe mọi cú click trên toàn trang
+        document.body.addEventListener('click', e => {
+            // Chỉ đánh chặn các thẻ <a> có thuộc tính data-link
+            const a = e.target.closest('a[data-link]');
+            if (a) {
+                e.preventDefault();
+                Router.navigate(a.href, containerSelector, true, mountCallback);
+            }
+        });
+        
+        // Lắng nghe sự kiện Back/Forward của trình duyệt
+        window.addEventListener('popstate', () => {
+            Router.navigate(location.pathname, containerSelector, false, mountCallback);
+        });
+    },
+
+    navigate: async (url, containerSelector, push, mountCallback) => {
+        if (push) history.pushState({}, "", url);
+        
+        const container = document.querySelector(containerSelector);
+        if (!container) return;
+
+        // 1. NGẮT ĐIỆN TOÀN BỘ COMPONENT CŨ (Thu hồi RAM Rust)
+        Motherboard.unplugTree(container);
+
+        try {
+            // 2. Tải trang tĩnh HTML (SSG)
+            const res = await fetch(url);
+            const html = await res.text();
+            
+            // 3. Bóc tách DOM mới
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newContent = doc.querySelector(containerSelector);
+            
+            // 4. Tráo DOM siêu tốc (Zero-Flicker)
+            if (newContent) container.innerHTML = newContent.innerHTML;
+
+            // 5. CẮM ĐIỆN LẠI CHO TRANG MỚI (Hydrate)
+            if (mountCallback) mountCallback();
+            Motherboard.wakeUp();
+            
+        } catch (err) {
+            console.error("[Router DOD] Lỗi chuyển trang:", err);
+        }
+    }
+};
