@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { blueprint, buildApp, pool } from './framework_v44.js';
+import { parse } from 'node-html-parser';
 
 // =========================================
 // 1. COMPONENT THẺ SHOP (G2 CARD)
@@ -52,7 +53,7 @@ const ShopCard = blueprint('ShopCard', (g) => {
         viewDetailsAction
     });
 
-    global.SHOP_CARD_HTML = compiledHtml; 
+    g.exportSSG(compiledHtml); 
 });
 
 // =========================================
@@ -82,27 +83,15 @@ const PlatformManager = blueprint('PlatformManager', (g) => {
     }), { newVal: 'value' }); 
 });
 
-// 3. BUILD VÀ TIÊM SSG
+// ==============================================================
+// 3. BULD ỨNG DỤNG BẰNG KIẾN TRÚC MỚI (CỰC KỲ ĐƠN GIẢN)
+// ==============================================================
 buildApp({
-    'body': PlatformManager,
-    '.shop-wrapper': pool(ShopCard, 20) 
-}, './public/app_compiled.js');
-
-// ==============================================================
-// 🌟 SSG INJECTOR: TÁCH BIỆT TEMPLATE VÀ OUTPUT (GIẢI PHÁP TRIỆT ĐỂ)
-// ==============================================================
-console.log("💉 Đang tiêm giao diện G2 Review vào index.html...");
-
-// 1. Đọc file GỐC từ thư mục templates (File này bất tử, không bao giờ bị hỏng)
-let templateHtml = fs.readFileSync('./templates/index.html', 'utf-8');
-
-// 2. Tạo 20 thẻ từ file HTML đã biên dịch
-const singleCard = `<div class="shop-wrapper absolute w-full left-0 pr-6">\n${global.SHOP_CARD_HTML}\n</div>\n`;
-const poolOfCards = singleCard.repeat(20);
-
-// 3. Thay thế thẻ đánh dấu bằng dữ liệu (Dùng string thay vì Regex)
-let finalHtml = templateHtml.replace('', poolOfCards);
-
-// 4. Xuất file ĐÃ TIÊM ra thư mục public để trình duyệt đọc
-fs.writeFileSync('./public/index.html', finalHtml);
-console.log("✅ Tiêm SSG hoàn tất (Đã đúc chính xác 20 thẻ vào public/index.html)!");
+    // Đăng ký toàn bộ Component vào đây
+    components: [PlatformManager, ShopCard], 
+    
+    // File cấu hình
+    template: './templates/index.html',
+    outHtml: './public/index.html',
+    outJs: './public/app_compiled.js'
+});

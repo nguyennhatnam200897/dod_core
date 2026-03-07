@@ -516,6 +516,7 @@ export const blueprint = (componentName, setupFn) => {
             // Đẩy vào bộ phân tích AST mà chúng ta đã viết
             return g.parseTemplate(rawHtml, variables);
         },
+        exportSSG: (htmlStr) => { exportedHtml = htmlStr; },
     };
 
     // Chạy file logic của user (code.js)
@@ -524,9 +525,10 @@ export const blueprint = (componentName, setupFn) => {
     // Yêu cầu compiler sinh mã JS, trả về Object thay vì chuỗi trơn
     return {
         name: componentName,
-        code: compiler.compile(componentName)
+        code: compiler.compile(componentName),
+        html: exportedHtml // 🌟 THÊM DÒNG NÀY ĐỂ XUẤT HTML
     };
-};
+}
 
 // THÊM MỚI: Định nghĩa kiểu dữ liệu Hồ chứa (Pool)
 export const pool = (blueprint, size) => ({ isPool: true, blueprint, size });
@@ -534,13 +536,61 @@ export const pool = (blueprint, size) => ({ isPool: true, blueprint, size });
 // 🌟 THÊM MỚI: Định nghĩa kiểu dữ liệu Lười biếng (Lazy/Template)
 export const lazy = (blueprint, templateSelector) => ({ isLazy: true, blueprint, templateSelector });
 
-// --- TRÌNH LẮP RÁP ỨNG DỤNG (APP BUNDLER TỰ ĐỘNG) ---
-export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
-    // 🌟 1. Nhập thêm bootEngineWasm
+// --- TRÌNH LẮP RÁP ỨNG DỤNG THẾ HỆ MỚI (DECLARATIVE BUNDLER) ---
+export const buildApp = (config) => {
+    const { components, template, outHtml, outJs = './public/app_compiled.js' } = config;
+    console.log("🚀 Đang khởi động Trình biên dịch DOD Thế Hệ Mới...");
+
+    const compMap = {};
+    components.forEach(c => compMap[c.name] = c);
+    const mountTargets = {}; // Tự động thu thập từ HTML
+
     let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from '../runtime_v44.js';\n\n`;
-    
-    // 🌟 BẢN VÁ: Gói TẤT CẢ Component vào ĐÚNG 1 HÀM execute_batch duy nhất
     let combinedRustCode = `// 🚀 FILE TỰ ĐỘNG SINH BỞI ENGINE DOD\nuse super::MotherboardCore;\n\nimpl MotherboardCore {\n    pub fn execute_batch(&mut self, chunk_id: usize, mut mask: u32) {\n        match self.comp_name.as_str() {\n`;
+
+    // 1. QUÉT VÀ TIÊM SSG TỰ ĐỘNG BẰNG AST
+    if (template && outHtml) {
+        console.log("💉 Đang quét file Template và tự động nối dây Component...");
+        const root = parse(fs.readFileSync(template, 'utf-8'));
+
+        // Xử lý <dod-pool>
+        root.querySelectorAll('dod-pool').forEach((el, index) => {
+            const compName = el.getAttribute('component');
+            const size = parseInt(el.getAttribute('size') || '1');
+            const wrapperClass = el.getAttribute('wrapper-class') || '';
+            const comp = compMap[compName];
+
+            if (!comp) throw new Error(`[AST] Không tìm thấy Component '${compName}'`);
+
+            let htmlStr = '';
+            const poolSelector = `dod-pool-${compName.toLowerCase()}-${index}`;
+
+            // Nhân bản HTML từ Component
+            for(let i=0; i<size; i++) {
+                htmlStr += `<div class="${wrapperClass} ${poolSelector}">\n${comp.html}\n</div>\n`;
+            }
+            el.replaceWith(htmlStr); // Đổi Custom Tag thành HTML thật
+            mountTargets[`.${poolSelector}`] = pool(comp, size); // Tự động ghi chú kết nối
+        });
+
+        // Xử lý dod-attach (Gắn Component vào một thẻ có sẵn)
+        root.querySelectorAll('[dod-attach]').forEach(el => {
+            const compName = el.getAttribute('dod-attach');
+            const comp = compMap[compName];
+            if (!comp) throw new Error(`[AST] Không tìm thấy Component '${compName}'`);
+
+            let selector = el.id ? `#${el.id}` : `dod-attach-${compName.toLowerCase()}`;
+            if (!el.id) el.classList.add(selector); // Cấp ID nếu chưa có
+            
+            mountTargets[el.id ? selector : `.${selector}`] = comp;
+            el.removeAttribute('dod-attach'); // Dọn dẹp SEO
+        });
+
+        fs.writeFileSync(outHtml, root.toString());
+        console.log(`✅ Đã đúc thành công giao diện và loại bỏ Custom Tags!`);
+    }
+
+    // 2. SINH CODE RUST VÀ JS (Với tính năng Tree-Shaking: Chỉ sinh code cho Component có dùng)
     const uniqueComps = new Set();
     Object.values(mountTargets).forEach(target => {
         if (target.isPool || target.isLazy) uniqueComps.add(target.blueprint);
@@ -549,60 +599,28 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
 
     uniqueComps.forEach(comp => { 
         finalJSCode += comp.code.js + '\n\n'; 
-        combinedRustCode += comp.code.rust + '\n'; // Các nhánh rẽ được nhét vào đây
+        combinedRustCode += comp.code.rust + '\n'; 
     });
-
-    // 🌟 BẢN VÁ: Đóng ngoặc khối lệnh
     combinedRustCode += `            _ => {}\n        }\n    }\n}\n`;
 
-    // 🌟 3. Bọc quá trình boot bằng Hàm Async để chờ WASM nạp xong
-    finalJSCode += `// --- KHỞI CHẠY HỆ THỐNG ---\n`;
-    finalJSCode += `async function startApp() {\n`;
-    finalJSCode += `    await bootEngineWasm();\n\n`; 
-
-    // 🌟 BẢN VÁ: Gói việc Cắm điện vào một hàm dùng chung
-    finalJSCode += `    window.mountComponents = () => {\n`;
+    // 3. KHỞI CHẠY TỰ ĐỘNG
+    finalJSCode += `async function startApp() {\n    await bootEngineWasm();\n    window.mountComponents = () => {\n`;
     for (const [selector, target] of Object.entries(mountTargets)) {
         if (target.isPool) {
             finalJSCode += `        if (document.querySelector('${selector}')) initObjectPool('${target.blueprint.name}', create${target.blueprint.name}, '${selector}', ${target.size});\n`;
-        } else if (target.isLazy) {
-            finalJSCode += `        Motherboard.registerLazy('${target.blueprint.name}', create${target.blueprint.name}, '${target.templateSelector}', '${selector}');\n`;
         } else {
-            // Kiểm tra thẻ HTML có tồn tại trên trang này không trước khi cắm điện
             finalJSCode += `        if (document.querySelector('${selector}')) create${target.name}(document.querySelector('${selector}'));\n`;
         }
     }
-    finalJSCode += `    };\n\n`;
+    finalJSCode += `    };\n    window.MB = Motherboard;\n    window.DSTR = DYNAMIC_STR;\n`;
+    finalJSCode += `    window.mountComponents();\n}\nstartApp();\n`;
 
-    finalJSCode += `    window.MB = Motherboard;\n    window.DSTR = DYNAMIC_STR;\n`;
-    finalJSCode += `    console.log("✅ Bo mạch chủ đã khởi động! Mọi Component đã sẵn sàng.");\n`;
-    
-    // 🌟 KÍCH HOẠT LẦN ĐẦU VÀ BẬT ROUTER ĐÁNH CHẶN
-    finalJSCode += `    window.mountComponents();\n`;
-    // Bạn có thể tùy chỉnh id #app-root này thành thẻ chứa nội dung chính của bạn
-    finalJSCode += `    Router.init('#app-root', window.mountComponents);\n`;
-    finalJSCode += `}\n\nstartApp();\n`;
+    fs.writeFileSync(outJs, finalJSCode);
+    fs.writeFileSync('./src/generated_compute.rs', combinedRustCode);
 
-    // 🌟 4. Ghi file JS
-    fs.writeFileSync(outputPath, finalJSCode);
-    console.log(`📝 Đã sinh mã Giao diện (JS): ${outputPath}`);
-
-    // 🌟 5. Ghi file Rust và tự động gọi wasm-pack
-    const rustFilePath = './src/generated_compute.rs'; 
-    fs.writeFileSync(rustFilePath, combinedRustCode);
-    console.log(`🦀 Đã sinh mã Lõi Tính toán (Rust): ${rustFilePath}`);
-
+    // BUILD WASM VÀ CSS
     console.log("⚙️ Đang mài dũa C++/Rust thành WebAssembly...");
-    try {
-        // Build WASM siêu tốc
-        execSync('wasm-pack build --target web', { stdio: 'inherit' });
-        
-        // 🌟 TÍCH HỢP TAILWIND V4 TỰ ĐỘNG
-        console.log("🎨 Đang dệt giao diện bằng Tailwind CSS v4...");
-        execSync('npx @tailwindcss/cli -i ./input.css -o ./public/style.css', { stdio: 'inherit' });
-        
-        console.log(`🎉 HOÀN TẤT! Toàn bộ Engine đã sẵn sàng chiến đấu ở tốc độ Native!`);
-    } catch (e) {
-        console.error("❌ Lỗi khi biên dịch!", e.message);
-    }
+    execSync('wasm-pack build --target web', { stdio: 'inherit' });
+    console.log("🎨 Đang dệt giao diện bằng Tailwind CSS v4...");
+    execSync('npx @tailwindcss/cli -i ./input.css -o ./public/style.css', { stdio: 'inherit' });
 };
