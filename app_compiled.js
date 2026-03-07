@@ -121,7 +121,7 @@ if (CACHE[0] !== val) {
   CACHE[0] = val; 
 } } 
 if (mask & 134217728) { 
-                    const textVal = (I32[2] >= 0 ? (LUT[I32[2]] || LUT[0]) : DYNAMIC_STR[-(I32[2] + 1)]);
+                    const textVal = (I32[2] >= 0 ? (LUT[I32[2]] || LUT[0]) : getDynamicString(I32[2]));
                     if (CACHE[1] !== textVal) { 
                         if (CACHE[1] === null) {
                             if (DOM[1].textContent !== String(textVal)) DOM[1].textContent = textVal;
@@ -515,7 +515,7 @@ if (CACHE[0] !== val) {
   CACHE[0] = val; 
 } } 
 if (mask & 268435456) { 
-                    const textVal = (LUT[1] || LUT[0]) + (I32[1] >= 0 ? (LUT[I32[1]] || LUT[0]) : DYNAMIC_STR[-(I32[1] + 1)]) + (LUT[2] || LUT[0]);
+                    const textVal = (LUT[1] || LUT[0]) + (I32[1] >= 0 ? (LUT[I32[1]] || LUT[0]) : getDynamicString(I32[1])) + (LUT[2] || LUT[0]);
                     if (CACHE[1] !== textVal) { 
                         if (CACHE[1] === null) {
                             if (DOM[1].textContent !== String(textVal)) DOM[1].textContent = textVal;

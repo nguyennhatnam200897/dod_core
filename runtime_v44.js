@@ -347,65 +347,123 @@ export const Motherboard = {
     }
 };
 
-export const DYNAMIC_STR = [];       // Lưu chuỗi thật
-const REF_COUNTS = [];               // Mảng đếm tham chiếu
-const FREE_LIST = [];                // Mảng chứa các index rảnh rỗi
-const STR_MAP = new Map();           // O(1) Lookup (String Interning)
+// ==============================================================
+// 🌟 KỶ NGUYÊN ZERO-ALLOCATION: STRING ARENA BUMP ALLOCATOR 🌟
+// ==============================================================
+const ARENA_CAPACITY = 4 * 1024 * 1024; // Cấp phát cứng 4MB RAM cho toàn bộ chuỗi động
+export const STRING_ARENA = new Uint8Array(ARENA_CAPACITY);
+let arenaHead = 0; // Con trỏ tịnh tiến (Chỉ tiến lên, không bao giờ lùi)
 
-// RETAIN (Cấp phát hoặc Tăng tham chiếu)
+// SoA Metadata (Thay thế Array Object JS bằng RAM Tĩnh)
+const MAX_STR_NODES = 65536; // Quản lý tối đa 64,000 chuỗi
+const STR_OFFSET = new Uint32Array(MAX_STR_NODES); // Lưu vị trí bắt đầu
+const STR_LEN    = new Uint32Array(MAX_STR_NODES); // Lưu độ dài byte
+const STR_REFS   = new Int32Array(MAX_STR_NODES);  // Đếm số lượng Node đang dùng
+const STR_FREE   = new Int32Array(MAX_STR_NODES);  // Kho chứa ID rảnh rỗi
+let metaCount = 0;
+let freeHead = 0;
+
+// Bộ mã hóa/Giải mã phần cứng của Trình duyệt (Rất nhanh và không xả rác)
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+// RETAIN (Ghi chuỗi vào RAM thô)
 export function setDynamicString(str) {
     if (typeof str !== 'string') return str; 
-    
+
+    // 1. Cấp phát ID Nguyên thủy O(1)
     let idx;
-    if (STR_MAP.has(str)) {
-        // Tái sử dụng: Chuỗi đã tồn tại
-        idx = STR_MAP.get(str);
-        REF_COUNTS[idx]++; 
+    if (freeHead > 0) {
+        freeHead--;
+        idx = STR_FREE[freeHead];
     } else {
-        // Cấp phát mới
-        if (FREE_LIST.length > 0) {
-            idx = FREE_LIST.pop(); // Lấy chỗ trống cũ
-        } else {
-            idx = DYNAMIC_STR.length; // Mở rộng Pool
-            REF_COUNTS.push(0); 
-        }
-        
-        DYNAMIC_STR[idx] = str;
-        STR_MAP.set(str, idx);
-        REF_COUNTS[idx] = 1;
+        idx = metaCount++;
     }
-    
-    return -(idx + 1); // Trả về ID âm
+
+    // Ước tính kích thước byte tối đa (UTF-8 có thể chiếm tới 3-4 bytes/ký tự)
+    const maxBytes = str.length * 4; 
+
+    // 🌟 PHÉP MÀU DOD: NẾU TRÀN RAM -> DỒN RÁC THỦ CÔNG (DEFRAGMENTATION)
+    if (arenaHead + maxBytes > ARENA_CAPACITY) {
+        compactArena();
+        if (arenaHead + maxBytes > ARENA_CAPACITY) {
+            console.error("[Engine Fatal] String Arena bị tràn! Hãy tăng ARENA_CAPACITY.");
+            return 0; // Fallback an toàn
+        }
+    }
+
+    // 2. ZERO-ALLOCATION ENCODE: Ghi đè trực tiếp vào RAM, không sinh ra object JS mới
+    const encodeResult = encoder.encodeInto(str, STRING_ARENA.subarray(arenaHead));
+
+    // 3. Cập nhật Metadata
+    STR_OFFSET[idx] = arenaHead;
+    STR_LEN[idx] = encodeResult.written;
+    STR_REFS[idx] = 1;
+
+    // Tịnh tiến con trỏ
+    arenaHead += encodeResult.written;
+
+    return -(idx + 1); // Trả về ID âm (Giữ nguyên chuẩn cũ của Compiler)
 }
 
-// RETAIN (Tăng tham chiếu khi một Node "mượn" chuỗi từ Node khác)
 export function retainDynamicString(id) {
-    if (id >= 0) return id; // Bỏ qua nếu là số thường hoặc chuỗi tĩnh (LUT)
-    
+    if (id >= 0) return id;
     const idx = -(id) - 1;
-    
-    if (idx >= 0 && idx < DYNAMIC_STR.length && DYNAMIC_STR[idx] !== null) {
-        REF_COUNTS[idx]++; // Tăng bộ đếm an toàn
-    }
+    if (STR_REFS[idx] > 0) STR_REFS[idx]++;
     return id;
 }
 
-// RELEASE (Giải phóng bộ nhớ)
 export function releaseDynamicString(id) {
-    if (id >= 0) return; // Bỏ qua nếu là chuỗi tĩnh (LUT) hoặc số thường
-    
+    if (id >= 0) return;
     const idx = -(id) - 1;
     
-    if (idx >= 0 && idx < DYNAMIC_STR.length && DYNAMIC_STR[idx] !== null) {
-        REF_COUNTS[idx]--;
+    if (STR_REFS[idx] > 0) {
+        STR_REFS[idx]--;
         
-        // Garbage Collection: Đã hết Node dùng chuỗi này
-        if (REF_COUNTS[idx] === 0) {
-            STR_MAP.delete(DYNAMIC_STR[idx]); // Xóa khỏi Map
-            DYNAMIC_STR[idx] = null;          // Giải phóng RAM cho Garbage Collector của JS
-            FREE_LIST.push(idx);              // Đưa index vào danh sách chờ tái sử dụng
+        // Khi không còn ai dùng, chỉ việc trả ID về kho rảnh rỗi.
+        // Tuyệt đối KHÔNG xóa byte trong STRING_ARENA. Byte cũ sẽ tự bị ghi đè sau này.
+        if (STR_REFS[idx] === 0) {
+            STR_FREE[freeHead] = idx;
+            freeHead++;
         }
     }
+}
+
+// ==============================================================
+// 🌟 BỘ GOM RÁC CƠ HỌC (THAY THẾ V8 GC) 🌟
+// Chạy cực nhanh nhờ TypedArray.copyWithin cấp thấp của C++
+// ==============================================================
+function compactArena() {
+    // console.warn("[Engine] Bắt đầu dồn phân mảnh String Arena...");
+    let newHead = 0;
+    
+    for (let i = 0; i < metaCount; i++) {
+        // Chỉ giữ lại những chuỗi đang SỐNG trên màn hình
+        if (STR_REFS[i] > 0) {
+            const len = STR_LEN[i];
+            const oldOffset = STR_OFFSET[i];
+            
+            // Dịch chuyển byte lên đầu Arena (Overscan an toàn)
+            if (newHead !== oldOffset) {
+                STRING_ARENA.copyWithin(newHead, oldOffset, oldOffset + len);
+                STR_OFFSET[i] = newHead; // Cập nhật lại tọa độ mới
+            }
+            newHead += len;
+        }
+    }
+    
+    arenaHead = newHead;
+    // console.log(`[Engine] Dồn RAM xong. Đã thu hồi và nén gọn còn: ${arenaHead} bytes.`);
+}
+
+// 🌟 HÀM XUẤT CHUỖI RA DOM (Chỉ giải mã ĐÚNG MỘT LẦN khi Render)
+export function getDynamicString(id) {
+    if (id >= 0) return ""; 
+    const idx = -(id) - 1;
+    const offset = STR_OFFSET[idx];
+    const len = STR_LEN[idx];
+    // Đây là nơi duy nhất JS Engine tạo ra String Object, và nó cắm thẳng vào DOM
+    return decoder.decode(STRING_ARENA.subarray(offset, offset + len));
 }
 
 // Khai báo biến toàn cục lưu trữ WASM

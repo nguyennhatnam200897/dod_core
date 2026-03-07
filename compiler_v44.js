@@ -243,7 +243,7 @@ class CompilerContext {
                         const accessor = acc[accIdx++];
                         const sourceNode = this.nodes[r.id];
                         if (sourceNode.semantic === 'STR' || sourceNode.mem === 'STR') {
-                            return `(${accessor} >= 0 ? (LUT[${accessor}] || LUT[0]) : DYNAMIC_STR[-(${accessor} + 1)])`;
+                            return `(${accessor} >= 0 ? (LUT[${accessor}] || LUT[0]) : getDynamicString(${accessor}))`;
                         } else return `String(${accessor})`; 
                     } else {
                         if (r.type === 'STR') return `(LUT[${r.code}] || LUT[0])`;
@@ -329,7 +329,7 @@ class CompilerContext {
                 
                 let code = `const rawVal = ${acc[0]};\n`;
                 if (isStr) {
-                    code += `const text = rawVal >= 0 ? (LUT[rawVal] || LUT[0]) : DYNAMIC_STR[-(rawVal + 1)];\n`;
+                    code += `const text = rawVal >= 0 ? (LUT[rawVal] || LUT[0]) : getDynamicString(rawVal);\n`;
                     code += `const finalVal = text + "${unit}";\n`;
                 } else {
                     code += `const finalVal = rawVal + "${unit}";\n`;
@@ -406,7 +406,7 @@ class CompilerContext {
                             `    else DOM[selfIdx].removeAttribute('${attrName}');\n` +
                             `  }\n`;
                 } else {
-                    code += `  const finalVal = ${isStr ? `val >= 0 ? (LUT[val] || LUT[0]) : DYNAMIC_STR[-(val + 1)]` : `val`};\n` +
+                    code += `  const finalVal = ${isStr ? `val >= 0 ? (LUT[val] || LUT[0]) : getDynamicString(val)` : `val`};\n` +
                             `  if (CACHE[selfIdx] === null) {\n` +
                             `    if (DOM[selfIdx].getAttribute('${attrName}') !== String(finalVal)) DOM[selfIdx].setAttribute('${attrName}', finalVal);\n` +
                             `  } else { DOM[selfIdx].setAttribute('${attrName}', finalVal); }\n`;
