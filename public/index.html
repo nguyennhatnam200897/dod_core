@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>G2 Ecom - Đánh giá Shop & Review</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex flex-col m-0 overflow-hidden">
+    
+    <header class="bg-white px-8 py-4 shadow-sm flex justify-between items-center z-50">
+        <h1 class="text-primary text-2xl font-black m-0 tracking-tight">⭐ TrustEcom</h1>
+        <div class="text-sm font-medium text-gray-500">Nền tảng Tín nhiệm Mua sắm lớn nhất VN</div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <aside class="w-80 bg-white p-6 border-r border-gray-200 z-30 shadow-sm">
+            <h2 class="font-bold text-lg mb-6 text-gray-800">Bộ lọc Uy tín</h2>
+            
+            <div class="mb-8">
+                <label class="font-bold block mb-3 text-gray-700">
+                    Trust Score tối thiểu: <span id="min-score-lbl" class="text-primary text-xl ml-1">0</span> ⭐
+                </label>
+                <input type="range" id="score-slider" min="0" max="10" step="0.5" value="0" class="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between text-xs text-gray-400 mt-2">
+                    <span>Mọi Shop</span>
+                    <span>Tuyệt đối (10⭐)</span>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
+                💡 <b>Mẹo:</b> Kéo thanh trượt để lọc ngay lập tức 50.000+ Shop theo tiêu chuẩn khắt khe nhất mà không có độ trễ.
+            </div>
+        </aside>
+
+        <main class="flex-1 relative p-6 bg-gray-50">
+            <div id="shop-grid" class="h-full overflow-y-auto relative block">
+                <div class="virtual-spacer w-px"></div>
+                
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+                <div class="shop-wrapper"></div> <div class="shop-wrapper"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        window.broadcastMinScore = (newVal) => {
+            if (!window.MB) return;
+            const pool = window.MB.pools['ShopCard'];
+            if (!pool) return;
+            pool.instances.forEach(inst => {
+                window.MB.sendSignal(inst._mbId, 'MIN_SCORE', parseFloat(newVal));
+            });
+            window.MB.wakeUp();
+        };
+    </script>
+    <script src="mock_db.js"></script>
+    <script type="module" src="app_compiled.js"></script>
+</body>
+</html>
