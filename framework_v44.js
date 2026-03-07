@@ -554,9 +554,9 @@ export const buildApp = (config) => {
     if (template && outHtml) {
         console.log("💉 Đang quét file Template và tự động nối dây Component...");
         const root = parse(fs.readFileSync(template, 'utf-8'));
-        const poolInjections = {}; // 🌟 BẢN VÁ: Kho chứa HTML để bơm bằng String sau khi AST chạy xong
+        const poolInjections = {}; // 🌟 Kho chứa HTML thật
 
-        // Xử lý <dod-pool>
+        // Xử lý <dod-pool> (ĐÃ DỌN SẠCH CODE TRÙNG)
         root.querySelectorAll('dod-pool').forEach((el, index) => {
             const compName = el.getAttribute('component');
             const size = parseInt(el.getAttribute('size') || '1');
@@ -566,20 +566,30 @@ export const buildApp = (config) => {
             if (!comp) throw new Error(`[AST] Không tìm thấy Component '${compName}'`);
 
             let htmlStr = '';
-            const poolSelector = `dod-pool-${compName.toLowerCase()}-${index}`;
-
             // Nhân bản HTML từ Component
             for(let i=0; i<size; i++) {
-                htmlStr += `<div class="${wrapperClass} ${poolSelector}">\n${comp.html}\n</div>\n`;
+                htmlStr += `<div class="${wrapperClass}">\n${comp.html}\n</div>\n`;
             }
             
-            // 🌟 CHIẾN THUẬT MỚI: Tráo thẻ dod-pool bằng 1 cục nam châm (Marker)
-            const marker = ``;
-            el.replaceWith(marker);
+            // 🌟 BẢN VÁ QUYẾT ĐỊNH: Dùng getAttribute('id') thay vì .id
+            const parent = el.parentNode;
+            const parentId = parent.getAttribute('id'); // Đọc ID chuẩn xác của Parser
+            let containerSelector = '';
             
-            // Cất 20 thẻ HTML vào kho
+            if (parentId) {
+                containerSelector = `#${parentId}`; // Lấy đúng ID (VD: #shop-grid)
+            } else {
+                const genId = `dod-pool-container-${index}`;
+                parent.setAttribute('id', genId);
+                containerSelector = `#${genId}`;
+            }
+
+            // Tráo thẻ <dod-pool> bằng Marker vô hại
+            const marker = `@@@DOD_POOL_MARKER_${index}@@@`;
+            el.replaceWith(marker); 
+            
             poolInjections[marker] = htmlStr; 
-            mountTargets[`.${poolSelector}`] = pool(comp, size); 
+            mountTargets[containerSelector] = pool(comp, size); 
         });
 
         // Xử lý dod-attach (Gắn Component vào một thẻ có sẵn)
@@ -588,15 +598,16 @@ export const buildApp = (config) => {
             const comp = compMap[compName];
             if (!comp) throw new Error(`[AST] Không tìm thấy Component '${compName}'`);
 
-            // Nếu thẻ chưa có id, tự động cấp 1 id cho nó
-            let selectorId = el.id ? el.id : `dod-attach-${compName.toLowerCase()}`;
-            if (!el.id) el.setAttribute('id', selectorId); 
+            // 🌟 BẢN VÁ: Dùng getAttribute('id')
+            const existingId = el.getAttribute('id');
+            let selectorId = existingId ? existingId : `dod-attach-${compName.toLowerCase()}`;
+            if (!existingId) el.setAttribute('id', selectorId); 
             
             mountTargets[`#${selectorId}`] = comp;
             el.removeAttribute('dod-attach'); // Dọn dẹp SEO
         });
 
-        // 🌟 BƯỚC QUYẾT ĐỊNH: Chuyển AST về chuỗi String, sau đó bơm 20 thẻ vào các cục nam châm
+        // 🌟 BƯỚC QUYẾT ĐỊNH: Xuất chuỗi AST và thế HTML thật vào
         let finalOutputHtml = root.toString();
         for (const marker in poolInjections) {
             finalOutputHtml = finalOutputHtml.replace(marker, poolInjections[marker]);
@@ -625,7 +636,8 @@ export const buildApp = (config) => {
         if (target.isPool) {
             finalJSCode += `        if (document.querySelector('${selector}')) initObjectPool('${target.blueprint.name}', create${target.blueprint.name}, '${selector}', ${target.size});\n`;
         } else {
-            finalJSCode += `        if (document.querySelector('${selector}')) create${target.name}(document.querySelector('${selector}'));\n`;
+            // 🌟 BẢN VÁ: Lưu vào biến inst và gọi inst.plug() để đánh thức Component!
+            finalJSCode += `        if (document.querySelector('${selector}')) { const inst = create${target.name}(document.querySelector('${selector}')); inst.plug(); }\n`;
         }
     }
     finalJSCode += `    };\n    window.MB = Motherboard;\n    window.DSTR = DYNAMIC_STR;\n`;

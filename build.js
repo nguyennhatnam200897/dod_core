@@ -8,7 +8,6 @@ const ShopCard = blueprint('ShopCard', (g) => {
     const props = g.defineProps({
         rowIndex: { port: 'ROW_INDEX', type: g.i32, default: -1 },
         minScoreFilter: { port: 'MIN_SCORE', type: g.f64, default: 0.0 }, // Cổng nhận số thực (Float64)
-        offsetY: { port: 'TRANSFORM_Y', type: g.i32, default: -9999 }
     });
 
     const shopName = g.globalRead('window.DB.NAME', props.rowIndex, g.str);
@@ -43,7 +42,6 @@ const ShopCard = blueprint('ShopCard', (g) => {
     // BINDING AST HTML
     const compiledHtml = g.parseTemplateFile('./templates/shop-card.html', {
         isVisible, 
-        offsetY: props.offsetY, // 🌟 SỬA Ở ĐÂY: Phải gọi qua props.offsetY
         shopName, 
         trustScoreText: [trustScore], 
         totalReviewsText: [totalReviews],
@@ -68,7 +66,7 @@ const PlatformManager = blueprint('PlatformManager', (g) => {
 
     // Khởi tạo Lưới cuộn ảo Virtual Scroll (20 Card gánh 50.000 Shop)
     const initStore = g.action({}, (tx) => {
-        tx.renderVirtualList('ShopCard', 'window.DB.ID', '#shop-grid', 180, {
+        tx.renderVirtualList('ShopCard', 'window.DB.NAME', '#shop-grid', 180, {
             $index: 'ROW_INDEX' 
         });
     });
