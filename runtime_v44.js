@@ -3,11 +3,22 @@ import initWasm, { MotherboardCore } from './pkg/dod_core.js';
 // ==============================================================
 // 🌟 HÀNG ĐỢI MẢNG VÒNG (RING BUFFER) O(1) - ZERO ALLOCATION
 // ==============================================================
-const MAX_COMPONENTS = 65536; // Giới hạn 64.000 Component chạy cùng lúc (Sức mạnh C++)
+const MAX_COMPONENTS = 65536;
 const QUEUE = new Int32Array(MAX_COMPONENTS);
 const IN_QUEUE = new Uint8Array(MAX_COMPONENTS);
 let qHead = 0;
 let qTail = 0;
+
+// THÊM ĐOẠN NÀY VÀO NGAY DƯỚI:
+// ==============================================================
+// 🌟 HỘP THƯ SỰ KIỆN (INPUT BUFFER) - BẢO VỆ LUỒNG TÍNH TOÁN
+// ==============================================================
+const EVENT_QUEUE_SIZE = 4096; // Sức chứa 4096 sự kiện chưa xử lý
+const EQ_COMP_IDS = new Array(EVENT_QUEUE_SIZE);
+const EQ_ACTION_NAMES = new Array(EVENT_QUEUE_SIZE); 
+const EQ_PAYLOADS = new Array(EVENT_QUEUE_SIZE);
+let eqHead = 0;
+let eqTail = 0;
 
 export const Motherboard = {
     components: new Array(MAX_COMPONENTS),
@@ -102,6 +113,40 @@ export const Motherboard = {
         }
     },
 
+    // 🌟 THÊM MỚI 1: Bỏ sự kiện vào hộp thư (Không xử lý ngay)
+    pushEvent: (mbId, actionName, args) => {
+        EQ_COMP_IDS[eqTail] = mbId;
+        EQ_ACTION_NAMES[eqTail] = actionName;
+        EQ_PAYLOADS[eqTail] = args;
+        
+        // Tịnh tiến đuôi mảng vòng O(1)
+        eqTail = (eqTail + 1) & (EVENT_QUEUE_SIZE - 1);
+        
+        // Đánh thức Engine dậy để chuẩn bị gom mẻ lưới
+        Motherboard.wakeUp();
+    },
+
+    // 🌟 THÊM MỚI 2: Xả toàn bộ hộp thư (Chỉ được gọi bởi vòng lặp của Engine)
+    flushEvents: () => {
+        while (eqHead !== eqTail) {
+            // Lấy thư ra đọc
+            const mbId = EQ_COMP_IDS[eqHead];
+            const actionName = EQ_ACTION_NAMES[eqHead];
+            const args = EQ_PAYLOADS[eqHead];
+            
+            // Tịnh tiến đầu mảng vòng
+            eqHead = (eqHead + 1) & (EVENT_QUEUE_SIZE - 1);
+            
+            const comp = Motherboard.components[mbId];
+            if (comp && comp.actions && comp.actions[actionName]) {
+                // Kích hoạt ghi RAM
+                comp.actions[actionName](...args);
+                // Báo cáo Component này đã bị bẩn (Dirty) để Engine biết mà tính toán
+                Motherboard.enqueue(mbId);
+            }
+        }
+    },
+
     callAction: (target, actionPortName, ...args) => {
         if (typeof target === 'string') Motherboard._ensureMounted(target);
         
@@ -111,10 +156,7 @@ export const Motherboard = {
         const actionId = targetComp.exportedActions[actionPortName];
         
         if (actionId && targetComp.actions[actionId]) {
-            targetComp.actions[actionId](...args);
-            // 🌟 BẢN VÁ 1: Đánh thức và xếp hàng Component nhận lệnh (Ví dụ: Cart, Popup)
-            Motherboard.enqueue(id);
-            Motherboard.wakeUp();
+            Motherboard.pushEvent(id, actionId, args);
         }
     },
     
@@ -260,7 +302,7 @@ export const Motherboard = {
                 if (inst._dataIndex !== i) {
                     inst._dataIndex = i;
                     // TRUYỀN THÊM rowIndex VÀO MAPPING NHƯ BẠN ĐÃ CẬP NHẬT Ở BƯỚC TRƯỚC
-                    mappingFn(inst._mbId, currentData[i], i);
+                    mappingFn(inst._mbId, null, i);
                     Motherboard.sendSignal(inst._mbId, 'TRANSFORM_Y', i * itemHeight);
                 }
             }
@@ -305,6 +347,9 @@ export const Motherboard = {
     // Chỉ chạy BATCHES_C (Logic & Toán học)
     tickCompute: () => {
         Motherboard.isComputing = true;
+
+        // 🌟 MỚI: XẢ TOÀN BỘ SỰ KIỆN TỪ USER TRƯỚC KHI TÍNH TOÁN!
+        Motherboard.flushEvents();
 
         while (qHead !== qTail) {
             const id = QUEUE[qHead];
@@ -619,12 +664,9 @@ function initGlobalDelegation(eventName) {
                 return input.value; // Trả về giá trị tĩnh nếu có
             });
 
-            // Bắn tín hiệu vào Action của đúng Component đó
-            comp.actions[actionName](...args, e);
-            
-            // 🌟 BẢN VÁ 2: Đánh thức và xếp hàng Component phát lệnh (Ví dụ: ProductItem)
-            Motherboard.enqueue(mbId);
-            Motherboard.wakeUp();
+            // 🌟 MỚI: Đẩy lệnh vào Hộp thư thoại (Input Buffer)
+            // Lưu ý: Chúng ta đẩy kèm cả biến 'e' (event gốc) vào cuối mảng args
+            Motherboard.pushEvent(mbId, actionName, [...args, e]);
         }
     });
 }
@@ -799,3 +841,26 @@ export const Router = {
         }
     }
 };
+
+
+// ==============================================================
+// 🌟 KHO LƯU TRỮ TOÀN CỤC (GLOBAL STORE) - ENGINE KHÔNG CAN THIỆP
+// ==============================================================
+export const DB = {}; 
+if (typeof window !== 'undefined') {
+    window.DB = DB; // Phơi ra window để Component dễ truy xuất
+}
+
+// Trình giải mã chuỗi từ vùng nhớ Nhị phân (Engine cung cấp công cụ, Project tự nạp data)
+const dbDecoder = new TextDecoder();
+export let DB_STRING_MEM = null;
+
+// API cho phép Project nạp vùng nhớ chứa chuỗi vào Engine
+export function setDbStringMem(uint8Array) {
+    DB_STRING_MEM = uint8Array;
+}
+
+export function getDbString(offset, length) {
+    if (!DB_STRING_MEM) return "";
+    return dbDecoder.decode(DB_STRING_MEM.subarray(offset, offset + length));
+}

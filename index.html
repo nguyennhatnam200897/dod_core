@@ -331,33 +331,12 @@
     </template>
 
     <script>
-        console.time("Generate SoA Data");
-        const TOTAL_ITEMS = 100000;
-        
-        window.DB = {
-            ID: new Int32Array(TOTAL_ITEMS),
-            // 🌟 XÓA PRICE VÀ STOCK, GOM CHUNG THÀNH PACKED_DATA
-            PACKED_DATA: new Int32Array(TOTAL_ITEMS), 
-            CART_QTY: new Int32Array(TOTAL_ITEMS),
-            NAME: new Array(TOTAL_ITEMS) 
-        };
-
-        for (let i = 0; i < TOTAL_ITEMS; i++) {
-            window.DB.ID[i] = i;
-            window.DB.NAME[i] = `Món hàng #` + (i + 1).toString().padStart(5, '0');
-            
-            const price = Math.floor(Math.random() * 500) * 1000 + 50000; 
-            const stock = Math.floor(Math.random() * 20); 
-            window.DB.CART_QTY[i] = 0;
-
-            // 🌟 THUẬT TOÁN ĐÓNG GÓI BIT (Bit-Packing)
-            // Dịch số Stock sang trái 24 bit (đẩy lên đầu), sau đó ghép Price vào 24 bit cuối
-            window.DB.PACKED_DATA[i] = (stock << 24) | price;
-        }
-        console.timeEnd("Generate SoA Data");
-
+        // Hàm đồng bộ dữ liệu giỏ hàng từ Component ra bộ nhớ Toàn cục
         window.syncCartData = function(id, addedQty) {
-            window.DB.CART_QTY[id] += addedQty;
+            // Sử dụng đúng tên mảng RAM mà Dự án đã cấp phát trong build.js
+            if (window.DB_CART_QTY) {
+                window.DB_CART_QTY[id] += addedQty;
+            }
         };
     </script>
     <script type="module" src="./app_compiled.js"></script>

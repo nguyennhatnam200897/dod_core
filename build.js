@@ -4,27 +4,40 @@ import { blueprint, buildApp, pool, lazy } from './framework_v44.js';
 // COMPONENT 1: THẺ SẢN PHẨM (ZERO-COPY RAM)
 // ==========================================
 const ProductItem = blueprint('ProductItem', (g) => {
+    // 1. Nhận Index dòng dữ liệu từ Virtual Scroll
     const props = g.defineProps({
         rowIndex: { port: 'ROW_INDEX', type: g.i32, default: 0 },
         offsetY:  { port: 'TRANSFORM_Y', type: g.i32, default: 0 }
     });
 
-    const id = g.globalRead('window.DB.ID', props.rowIndex, g.i32);
-    const name = g.globalRead('window.DB.NAME', props.rowIndex, g.str);
-    const cartQty = g.globalRead('window.DB.CART_QTY', props.rowIndex, g.i32);
-
-    // 🌟 KỲ QUAN DATA-ORIENTED: GIẢI NÉN TỪ MẢNG GỘP
-    // 1. Lấy Price: Đọc 24 bit cuối cùng (mask 0xFFFFFF)
-    const price = g.globalRead('window.DB.PACKED_DATA', props.rowIndex, g.i32, { mask: 0xFFFFFF });
+    const id = g.globalRead('DB.ids', props.rowIndex, g.i32);
+    const price = g.globalRead('DB.prices', props.rowIndex, g.f64);
+    const stock = g.globalRead('DB.stocks', props.rowIndex, g.i32);
     
-    // 2. Lấy Stock: Đọc 8 bit đầu tiên (Dịch phải 24 bit, rồi chặn bằng mask 0xFF)
-    const stock = g.globalRead('window.DB.PACKED_DATA', props.rowIndex, g.i32, { shift: 24, mask: 0xFF });
-    const remainStock = g.sub(stock, cartQty);
+    const nameOffset = g.globalRead('DB.nameOffsets', props.rowIndex, g.i32);
+    const nameLength = g.globalRead('DB.nameLengths', props.rowIndex, g.i32);
+    const name = g.dbReadString(nameOffset, nameLength);
 
-    // 3. Logic UI giữ nguyên, nhưng dùng các biến cục bộ vừa lấy được
+    // 🌟 THUẬT TOÁN BÓNG TRẠNG THÁI (ĐÃ FIX LỖI DOUBLE COUNT)
+    const cartQtyBase = g.globalRead('window.DB_CART_QTY', props.rowIndex, g.i32);
+    
+    // Lưu lại index của row cuối cùng mà User đã BẤM NÚT trên Thẻ này
+    const lastInteractedRow = g.state(g.i32, -1);
+    // Lưu lại số lượng tổng của row đó
+    const localQty = g.state(g.i32, 0);
+
+    // Kiểm tra xem thẻ này có đang thao tác đúng cái row mình vừa bấm không?
+    const isInteracting = g.eq(lastInteractedRow, props.rowIndex);
+
+    // BÍ QUYẾT: Nếu đang bấm liên tục -> Lấy localQty. Nếu vừa cuộn tới -> Lấy cartQtyBase từ RAM.
+    const cartQty = g.if(isInteracting).return(localQty).else(cartQtyBase);
+
+    // 2. Logic tính toán Tồn kho (Dựa trên cartQty chuẩn)
+    const remainStock = g.sub(stock, cartQty);
     const isOutOfStock = g.lte(remainStock, 0);
     const isLowStock = g.and( g.gt(remainStock, 0), g.lte(remainStock, 5) );
 
+    // 3. Ràng buộc giao diện
     g.bindTransformY('.virtual-wrapper', props.offsetY); 
     g.bindText('.product-name', name);
     g.bindText('.product-price', price, " đ");
@@ -34,26 +47,26 @@ const ProductItem = blueprint('ProductItem', (g) => {
     g.bindAttr('.btn-buy', 'disabled', isOutOfStock);
     g.bindClass('.btn-buy', 'btn-disabled', isOutOfStock);
 
+    // 4. Logic Mua hàng cực kỳ chính xác
     const canAdd = g.lt(cartQty, stock); 
     const actualAdd = g.if(canAdd).return(1).else(0);
-    // 🌟 LOGIC MỚI: Kích hoạt Popup ngay khi vừa cạn kho
-    // 1. Nhìn trước tương lai: Tồn kho sẽ còn lại bao nhiêu SAU cú click này?
-    const nextRemainStock = g.sub(remainStock, actualAdd);
     
-    // 2. Nếu tồn kho tương lai chạm mốc 0 (hoặc nhỏ hơn), lập tức xả điện gọi Popup!
+    // 🌟 BẢN VÁ POPUP: Nhìn trước tương lai!
+    // Trừ thử số lượng, nếu tương lai kho về <= 0 thì bật Popup cảnh báo ngay lập tức
+    const nextRemainStock = g.sub(remainStock, actualAdd);
     const isError = g.lte(nextRemainStock, 0);
 
     const buyAction = g.action({}, (tx) => {
-        // Gửi sang Giỏ Hàng
-        tx.call('Cart', 'ADD_ITEM_ACTION', actualAdd, price);
-        // Gọi Popup
-        tx.call('PopupModal', 'TRIGGER_ACTION', isError, name);
-        // Đồng bộ ngược ra DB Toàn cục
-        tx.callJS('syncCartData', id, actualAdd);
+        // Cập nhật State: Nhớ lại dòng mình vừa bấm
+        tx.access(lastInteractedRow).set(props.rowIndex);
         
-        // Cập nhật giao diện: Tăng biến cartQty hiện tại lên
-        // (Lưu ý: Do chúng ta đọc từ mảng toàn cục, nên phải ép cập nhật biến cục bộ tạm thời)
-        tx.access(cartQty).update(val => g.add(val, actualAdd));
+        // 🌟 QUAN TRỌNG: Cập nhật localQty = cartQty (chính xác hiện tại) + actualAdd
+        tx.access(localQty).set( g.add(cartQty, actualAdd) );
+
+        // Phát lệnh ra ngoài hệ thống
+        tx.call('Cart', 'ADD_ITEM_ACTION', actualAdd, price);
+        tx.call('PopupModal', 'TRIGGER_ACTION', isError, name);
+        tx.callJS('syncCartData', props.rowIndex, actualAdd);
     });
     g.onClick('.btn-buy', buyAction);
 });
@@ -63,20 +76,13 @@ const ProductItem = blueprint('ProductItem', (g) => {
 // ==========================================
 const PopupModal = blueprint('PopupModal', (g) => {
     const isOpen = g.state(g.i32, 0);
-    const msg = g.state(g.str, ""); // Tên sản phẩm bị lỗi
+    const msg = g.state(g.str, ""); 
 
-    // Hiện Modal bằng CSS display: flex nếu isOpen == 1
     g.bindShow('.modal-overlay', isOpen, 'flex');
-    
-    // 🌟 BẢN VÁ: Truyền thẳng tất cả các mảnh ghép vào bindText
-    // Engine sẽ tự động decode ID -> String và nối chúng lại ở tốc độ ánh sáng!
     g.bindText('#modal-msg', "Bạn không thể thêm ", msg, " nữa vì đã hết hàng trong kho.");
 
-    // Cổng nhận tín hiệu từ các ProductItem
     const triggerAction = g.action({ shouldOpen: g.i32, productName: g.str }, (tx, inputs) => {
-        // Nếu shouldOpen == 1 -> Gán isOpen = 1. Nếu == 0 -> Giữ nguyên trạng thái cũ.
         const nextState = g.if(inputs.shouldOpen).return(1).else(isOpen);
-        // Cập nhật thông báo nếu được phép mở
         const nextMsg = g.if(inputs.shouldOpen).return(inputs.productName).else(msg);
         
         tx.access(isOpen).set(nextState);
@@ -84,7 +90,6 @@ const PopupModal = blueprint('PopupModal', (g) => {
     });
     g.exportAction('TRIGGER_ACTION', triggerAction);
 
-    // Hành động đóng Modal
     const closeAction = g.action({}, (tx) => {
         tx.access(isOpen).set(0);
     });
@@ -92,57 +97,39 @@ const PopupModal = blueprint('PopupModal', (g) => {
 });
 
 // ==========================================
-// COMPONENT 2: GIỎ HÀNG THÔNG MINH (Tính toán phức tạp)
+// COMPONENT 2: GIỎ HÀNG THÔNG MINH
 // ==========================================
 const Cart = blueprint('Cart', (g) => {
-    // State cơ bản
     const totalQty = g.state(g.i32, 0);
     const subTotal = g.state(g.i32, 0);
-    const promoCode = g.state(g.str, ""); // State lưu chuỗi do người dùng gõ
+    const promoCode = g.state(g.str, ""); 
 
-    // 1. Two-way binding cho ô nhập mã khuyến mãi
     g.bindInput('#promo-input', promoCode);
 
-    // 2. STRESS TEST LUẬT NGHIỆP VỤ (BUSINESS LOGIC)
-    // Engine DOD sẽ so sánh chuỗi ở tốc độ O(1) nhờ String Interning!
     const isVipCode = g.eq(promoCode, "VIP2026");
     const isFreeShip = g.eq(promoCode, "FREESHIP");
 
-    // Tính tiền khuyến mãi bằng ConditionChain (Exhaustive Pattern Matching)
-    // VIP2026: Giảm 20% tổng bill (ÉP KIỂU KẾT QUẢ VỀ I32 ĐỂ CẮT BỎ SỐ THẬP PHÂN)
-    // FREESHIP: Giảm cứng 30.000 đ
-    // Còn lại: Giảm 0 đ
     const discountAmt = g.if(isVipCode).return( g.cast(g.div(g.mul(subTotal, 20), 100), g.i32) )
                          .elseif(isFreeShip).return( 30000 )
                          .else( 0 );
 
-    // Khuyến mãi không được vượt quá Subtotal (Tránh âm tiền)
     const safeDiscount = g.min(discountAmt, subTotal);
-
-    // MẸO: Tương tự, Tiền VAT cũng là phép chia, bạn nên ép kiểu về I32 
-    // để tiền VNĐ không bị lẻ ra số thập phân (Ví dụ: 1205.5 VNĐ)
     const priceAfterDiscount = g.sub(subTotal, safeDiscount);
     const vatAmt = g.cast(g.div(g.mul(priceAfterDiscount, 8), 100), g.i32);
 
-    // TỔNG TIỀN CUỐI CÙNG
     const finalTotal = g.add(priceAfterDiscount, vatAmt);
 
-    // 3. Xả điện ra màn hình
     g.bindText('#cart-qty', totalQty);
     g.bindText('#cart-subtotal', subTotal, " đ");
     g.bindText('#cart-discount', safeDiscount, " đ");
     g.bindText('#cart-vat', vatAmt, " đ");
     g.bindText('#cart-final', finalTotal, " đ");
-
-    // Chỉ hiện nút Thanh toán nếu có món hàng (totalQty > 0)
     g.bindShow('#btn-checkout', g.gt(totalQty, 0), 'block');
 
-    // 4. Mở cổng RPC nhận lệnh từ Sản phẩm
-    const addItemAction = g.action({ qty: g.i32, price: g.i32 }, (tx, { qty, price }) => {
-        // Cộng dồn Số lượng
+    const addItemAction = g.action({ qty: g.i32, price: g.f64 }, (tx, { qty, price }) => {
         tx.access(totalQty).update(val => g.add(val, qty));
-        // Cộng dồn Tiền (subTotal += qty * price)
-        tx.access(subTotal).update(val => g.add(val, g.mul(qty, price)));
+        const amtToAdd = g.cast(g.mul( g.cast(qty, g.f64), price ), g.i32);
+        tx.access(subTotal).update(val => g.add(val, amtToAdd));
     });
     g.exportAction('ADD_ITEM_ACTION', addItemAction);
 });
@@ -152,9 +139,7 @@ const Cart = blueprint('Cart', (g) => {
 // ==========================================
 const ShopManager = blueprint('ShopManager', (g) => {
     const initStore = g.action({}, (tx) => {
-        // 🌟 BẢN VÁ: Truyền ID ảo (Chỉ đóng vai trò độ dài của list)
-        tx.renderVirtualList('ProductItem', 'window.DB.ID', '#product-grid', 140, {
-            // Mapping siêu tốc: Báo Engine nhét `rowIndex` vào cổng `ROW_INDEX`
+        tx.renderVirtualList('ProductItem', 'window.DB_DUMMY_ARRAY', '#product-grid', 140, {
             $index: 'ROW_INDEX' 
         });
     });
@@ -162,12 +147,35 @@ const ShopManager = blueprint('ShopManager', (g) => {
 });
 
 // ==========================================
-// ĐÓNG GÓI VÀ XUẤT XƯỞNG
+// ĐÓNG GÓI VÀ XUẤT XƯỞNG DỰ ÁN
 // ==========================================
+const myProjectBootScript = `
+    console.log("[Project] Đang tải products.bin...");
+    const res = await fetch('./products.bin');
+    const buffer = await res.arrayBuffer();
+    const view = new DataView(buffer);
+    const N = view.getInt32(0, true);
+    const stringBytesLen = view.getInt32(4, true);
+    
+    let cursor = 8;
+    window.DB.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    window.DB.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
+    window.DB.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    window.DB.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    window.DB.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    
+    const strMem = new Uint8Array(buffer, cursor, stringBytesLen);
+    setDbStringMem(strMem);
+    
+    window.DB_CART_QTY = new Int32Array(N);
+    window.DB_DUMMY_ARRAY = new Array(N).fill(0);
+    
+    console.log(\`[Project] Đã nạp thành công \${N} sản phẩm vào RAM tĩnh.\`);
+`;
+
 buildApp({
     'body': ShopManager,
     '#product-grid': pool(ProductItem, 20),
     '#cart-widget': Cart,
-    // 🌟 KHAI BÁO BẰNG CÚ PHÁP LAZY: Mount vào #modal-container, lấy khuôn từ #modal-tpl
     '#modal-container': lazy(PopupModal, '#modal-tpl') 
-}, './app_compiled.js')
+}, './app_compiled.js', myProjectBootScript);

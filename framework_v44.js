@@ -405,6 +405,22 @@ export const blueprint = (componentName, setupFn) => {
             return new NodeHandle(node._id, type);
         },
 
+        // 🌟 THÊM MỚI CHỖ NÀY: API đọc chuỗi nhị phân
+        dbReadString: (offsetNode, lengthNode) => {
+            const off = resolve(offsetNode);
+            const len = resolve(lengthNode);
+            const node = compiler._add({
+                type: 'COMPUTE', mem: 'I32', semantic: 'STR', pipeline: 'COMPUTE', inputs: [off.id, len.id],
+                skipRust: true, // Chỉ JS giải mã chuỗi
+                gen: (acc, target) => {
+                    if (target === 'RUST') return `0`;
+                    // Đọc từ DB và tự động nén vào String Arena
+                    return `setDynamicString(getDbString(${acc[0]}, ${acc[1]}))`; 
+                }
+            });
+            return new NodeHandle(node._id, TYPE.STR);
+        },
+
         // --- 10. CONDITIONAL BRANCHING ---
         ifElse: (cond, trueVal, falseVal) => resolve(cond).ifElse(trueVal, falseVal),
 
@@ -458,9 +474,9 @@ export const pool = (blueprint, size) => ({ isPool: true, blueprint, size });
 export const lazy = (blueprint, templateSelector) => ({ isLazy: true, blueprint, templateSelector });
 
 // --- TRÌNH LẮP RÁP ỨNG DỤNG (APP BUNDLER TỰ ĐỘNG) ---
-export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
+export const buildApp = (mountTargets, outputPath = './app_compiled.js', bootScript = '') => {
     // 🌟 1. Nhập thêm bootEngineWasm
-    let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from './runtime_v44.js';\n\n`;
+    let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router, getDynamicString, STRING_ARENA, setDbStringMem, getDbString } from './runtime_v44.js';\n\n`;
     
     // 🌟 BẢN VÁ: Gói TẤT CẢ Component vào ĐÚNG 1 HÀM execute_batch duy nhất
     let combinedRustCode = `// 🚀 FILE TỰ ĐỘNG SINH BỞI ENGINE DOD\nuse super::MotherboardCore;\n\nimpl MotherboardCore {\n    pub fn execute_batch(&mut self, chunk_id: usize, mut mask: u32) {\n        match self.comp_name.as_str() {\n`;
@@ -497,12 +513,19 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
     }
     finalJSCode += `    };\n\n`;
 
-    finalJSCode += `    window.MB = Motherboard;\n    window.DSTR = DYNAMIC_STR;\n`;
+    finalJSCode += `    window.MB = Motherboard;\n`;
+    finalJSCode += `    window.STRING_ARENA = STRING_ARENA;\n`;
+    finalJSCode += `    window.getDynamicString = getDynamicString;\n`;
+    finalJSCode += `    window.getDbString = getDbString;\n`;
     finalJSCode += `    console.log("✅ Bo mạch chủ đã khởi động! Mọi Component đã sẵn sàng.");\n`;
     
-    // 🌟 KÍCH HOẠT LẦN ĐẦU VÀ BẬT ROUTER ĐÁNH CHẶN
+    // 🌟 CHÈN SCRIPT KHỞI TẠO CỦA RIÊNG DỰ ÁN VÀO ĐÂY
+    if (bootScript) {
+        finalJSCode += `\n    // --- PROJECT BOOT SCRIPT ---\n`;
+        finalJSCode += `    ${bootScript}\n\n`;
+    }
+
     finalJSCode += `    window.mountComponents();\n`;
-    // Bạn có thể tùy chỉnh id #app-root này thành thẻ chứa nội dung chính của bạn
     finalJSCode += `    Router.init('#app-root', window.mountComponents);\n`;
     finalJSCode += `}\n\nstartApp();\n`;
 

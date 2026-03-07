@@ -157,8 +157,8 @@ class CompilerContext {
                 }
                 
                 let valX = acc[0], valY = acc[1];
-                if (isStrA) valX = `(${acc[0]} >= 0 ? (LUT[${acc[0]}] || LUT[0]) : DYNAMIC_STR[-(${acc[0]} + 1)])`;
-                if (isStrB) valY = `(${acc[1]} >= 0 ? (LUT[${acc[1]}] || LUT[0]) : DYNAMIC_STR[-(${acc[1]} + 1)])`;
+                if (isStrA) valX = `(${acc[0]} >= 0 ? (LUT[${acc[0]}] || LUT[0]) : getDynamicString(${acc[0]}))`;
+                if (isStrB) valY = `(${acc[1]} >= 0 ? (LUT[${acc[1]}] || LUT[0]) : getDynamicString(${acc[1]}))`;
                 return `(${valX} ${operator} ${valY} ? 1 : 0)`;
             }
         });
@@ -363,7 +363,7 @@ class CompilerContext {
             gen: (acc) => {
                 let valExpr = acc[0];
                 if (isStr) {
-                    valExpr = `(${acc[0]} >= 0 ? (LUT[${acc[0]}] || LUT[0]) : DYNAMIC_STR[-(${acc[0]} + 1)])`;
+                    valExpr = `(${acc[0]} >= 0 ? (LUT[${acc[0]}] || LUT[0]) : getDynamicString(${acc[0]}))`;
                 }
                 
                 return `const val = String(${valExpr});\n` +
@@ -552,7 +552,7 @@ class CompilerContext {
                             const sourceNode = this.nodes[d.sourceId];
                             const tempVar = d._tempVal; 
                             if (sourceNode.semantic === 'STR' || sourceNode.mem === 'STR') {
-                                code += `Motherboard.sendSignal("${d.targetComponent}", "${d.portName}", ${tempVar} >= 0 ? (LUT[${tempVar}] || LUT[0]) : DYNAMIC_STR[-(${tempVar} + 1)]);\n`;
+                                code += `Motherboard.sendSignal("${d.targetComponent}", "${d.portName}", ${tempVar} >= 0 ? (LUT[${tempVar}] || LUT[0]) : getDynamicString(${tempVar}));\n`;
                             } else {
                                 code += `Motherboard.sendSignal("${d.targetComponent}", "${d.portName}", ${tempVar});\n`;
                             }
@@ -561,7 +561,7 @@ class CompilerContext {
                                 const oldId = d.argIds[i];
                                 const node = this.nodes[oldId];
                                 if (node.semantic === 'STR' || node.mem === 'STR') {
-                                    return `${tempVar} >= 0 ? (LUT[${tempVar}] || LUT[0]) : DYNAMIC_STR[-(${tempVar} + 1)]`;
+                                    return `${tempVar} >= 0 ? (LUT[${tempVar}] || LUT[0]) : getDynamicString(${tempVar})`;
                                 }
                                 return tempVar;
                             });
@@ -586,7 +586,7 @@ class CompilerContext {
                                 const oldId = d.argIds[i];
                                 const node = this.nodes[oldId];
                                 if (node.semantic === 'STR' || node.mem === 'STR') {
-                                    return `${tempVar} >= 0 ? (LUT[${tempVar}] || LUT[0]) : DYNAMIC_STR[-(${tempVar} + 1)]`;
+                                    return `${tempVar} >= 0 ? (LUT[${tempVar}] || LUT[0]) : getDynamicString(${tempVar})`;
                                 }
                                 return tempVar;
                             });
