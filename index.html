@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Siêu Thị 100.000 Món - DOD Engine</title>
+    <style>
+        body { font-family: system-ui; background: #f1f5f9; padding: 20px; margin: 0; display: flex; gap: 20px; height: 100vh; box-sizing: border-box; }
+        
+        /* CỘT TRÁI: KHUNG CUỘN ẢO */
+        .main-col { flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { padding: 20px; background: #1e293b; color: white; }
+        #product-grid { flex: 1; overflow-y: auto; position: relative; }
+        
+        /* THIẾT KẾ 1 SẢN PHẨM */
+        .virtual-wrapper { 
+            position: absolute; left: 0; width: 100%; height: 140px; 
+            box-sizing: border-box; padding: 15px 20px; 
+            border-bottom: 1px solid #e2e8f0; 
+            
+            /* KHÓA CHẶT LAYOUT TRUYỀN THỐNG */
+            contain: strict; 
+            
+            /* 🌟 TỐI ƯU HÓA GPU VÀ TRÁNH RÁC RAM: Dùng biến CSS --y */
+            will-change: transform;
+            transform: translateY(var(--y, 0px));
+        }
+        .product-card { display: flex; justify-content: space-between; align-items: center; height: 100%; }
+        .badge-out { display: none; background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 5px; width: fit-content; }
+        .badge-low { display: none; background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 5px; width: fit-content; }
+        .btn-buy { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-buy:active { transform: scale(0.95); }
+        .btn-disabled { background: #cbd5e1 !important; cursor: not-allowed !important; color: #94a3b8 !important; transform: none !important; }
+
+        /* CỘT PHẢI: GIỎ HÀNG THÔNG MINH */
+        .sidebar { width: 350px; background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 15px; }
+        .summary-row { display: flex; justify-content: space-between; font-size: 16px; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+        .promo-box { display: flex; gap: 10px; margin-top: 10px; }
+        .promo-box input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.7); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-box { background: white; padding: 30px; border-radius: 16px; width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); transform: scale(0.95); animation: pop 0.2s forwards ease-out; }
+        @keyframes pop { to { transform: scale(1); } }
+        .btn-close-modal { padding: 12px 30px; background: #64748b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; width: 100%; transition: 0.2s; }
+        .btn-close-modal:hover { background: #475569; }
+    </style>
+</head>
+<body>
+
+    <div class="main-col">
+        <div class="header"><h2>🚀 Kho Hàng: 100.000 Sản phẩm</h2></div>
+        
+        <div id="product-grid" style="overflow-y: auto; position: relative; will-change: transform;">
+            <div class="virtual-spacer" style="width: 1px; position: absolute; height: 1.4e+07px;"></div>
+            
+            <div class="virtual-wrapper" style="--y: 0px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00001</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 140px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00002</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">493000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">3</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 280px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00003</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">269000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 420px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00004</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">301000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">2</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 560px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00005</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">233000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 700px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00006</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">440000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">18</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 840px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00007</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">130000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">16</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 980px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00008</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">321000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">1</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1120px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01469</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">388000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">5</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1260px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01470</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">216000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">16</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1400px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01471</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">169000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">15</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1540px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01472</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">183000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">1</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1680px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00933</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">265000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">7</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1820px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00934</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">544000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">7</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 1960px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00935</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">226000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">6</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 2100px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: block;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00936</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">129000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">0</span></div>
+                    </div>
+                    <button class="btn-buy btn-disabled" disabled="">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 2240px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00937</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">122000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 2380px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00938</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">523000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">4</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 2520px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00939</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">265000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+            <div class="virtual-wrapper" style="--y: 2660px;">
+                <div class="product-card">
+                    <div>
+                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00400</div>
+                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">524000 đ</div>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    </div>
+                    <button class="btn-buy">Thêm vào giỏ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="cart-widget" class="sidebar">
+        <h2 style="margin: 0; color: #10b981;">🛒 Giỏ hàng của bạn</h2>
+        
+        <div class="summary-row"><span>Số lượng món:</span><strong id="cart-qty">0</strong></div>
+        <div class="summary-row"><span>Tạm tính:</span><strong id="cart-subtotal">0 đ</strong></div>
+        
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <strong style="font-size: 14px;">Mã giảm giá (Thử gõ: VIP2026 hoặc FREESHIP)</strong>
+            <div class="promo-box">
+                <input type="text" id="promo-input" placeholder="Nhập mã...">
+            </div>
+        </div>
+
+        <div class="summary-row" style="color: #10b981;"><span>Khuyến mãi:</span><strong id="cart-discount">0 đ</strong></div>
+        <div class="summary-row" style="color: #64748b;"><span>VAT (8%):</span><strong id="cart-vat">0 đ</strong></div>
+        
+        <div class="summary-row" style="font-size: 20px; color: #ef4444; font-weight: 900; border: none; margin-top: 10px;">
+            <span>TỔNG TIỀN:</span><strong id="cart-final">0 đ</strong>
+        </div>
+
+        <button id="btn-checkout" style="padding: 15px; background: #ef4444; color: white; font-weight: bold; border-radius: 8px; border: none; font-size: 16px; cursor: pointer; display: none;">TIẾN HÀNH THANH TOÁN</button>
+    </div>
+
+    <div id="modal-container"></div>
+
+    <template id="modal-tpl">
+        <div id="alert-modal" class="modal-overlay">
+            <div class="modal-box">
+                <div style="font-size: 50px; margin-bottom: 10px;">⚠️</div>
+                <h2 style="margin: 0 0 10px 0; color: #0f172a;">Rất tiếc!</h2>
+                <p id="modal-msg" style="color: #475569; font-size: 16px; margin-bottom: 20px;">Sản phẩm đã đạt giới hạn tồn kho.</p>
+                <button class="btn-close-modal">Đã hiểu</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        console.time("Generate SoA Data");
+        const TOTAL_ITEMS = 100000;
+        
+        window.DB = {
+            ID: new Int32Array(TOTAL_ITEMS),
+            // 🌟 XÓA PRICE VÀ STOCK, GOM CHUNG THÀNH PACKED_DATA
+            PACKED_DATA: new Int32Array(TOTAL_ITEMS), 
+            CART_QTY: new Int32Array(TOTAL_ITEMS),
+            NAME: new Array(TOTAL_ITEMS) 
+        };
+
+        for (let i = 0; i < TOTAL_ITEMS; i++) {
+            window.DB.ID[i] = i;
+            window.DB.NAME[i] = `Món hàng #` + (i + 1).toString().padStart(5, '0');
+            
+            const price = Math.floor(Math.random() * 500) * 1000 + 50000; 
+            const stock = Math.floor(Math.random() * 20); 
+            window.DB.CART_QTY[i] = 0;
+
+            // 🌟 THUẬT TOÁN ĐÓNG GÓI BIT (Bit-Packing)
+            // Dịch số Stock sang trái 24 bit (đẩy lên đầu), sau đó ghép Price vào 24 bit cuối
+            window.DB.PACKED_DATA[i] = (stock << 24) | price;
+        }
+        console.timeEnd("Generate SoA Data");
+
+        window.syncCartData = function(id, addedQty) {
+            window.DB.CART_QTY[id] += addedQty;
+        };
+    </script>
+    <script type="module" src="./app_compiled.js"></script>
+</body>
+</html>

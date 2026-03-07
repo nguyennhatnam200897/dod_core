@@ -450,43 +450,18 @@ export function allocMemory(counts, compName) {
 // Cập nhật hàm hydrate (Kết hợp DOM giả ngay từ đầu nếu thiếu)
 export function hydrate(root, fingerprint, domArray, cacheArray) {
 
-    // 🌟 1. VÉT DOM O(1) CHÍNH XÁC TUYỆT ĐỐI
-    // Mảng chứa các thẻ động, được xếp đúng theo số thứ tự d="0", d="1"...
-    const dynamicNodes = [];
-    
-    // Kiểm tra xem chính thẻ bọc ngoài cùng (root) có điện không
-    if (root.hasAttribute && root.hasAttribute('d')) {
-        dynamicNodes[root.getAttribute('d')] = root;
-    }
-    
-    // Kiểm tra tất cả thẻ con bên trong
-    const children = root.querySelectorAll('[d]');
-    for (let i = 0; i < children.length; i++) {
-        const el = children[i];
-        dynamicNodes[el.getAttribute('d')] = el;
-    }
-
-    // 🌟 2. XÓA SẠCH DẤU VẾT BẢO MẬT (Tự hủy)
-    for (let i = 0; i < dynamicNodes.length; i++) {
-        if (dynamicNodes[i]) {
-            dynamicNodes[i].removeAttribute('d');
-        }
-    }
-
-    // 🌟 3. HYDRATE SIÊU TỐC VỚI ARRAY[INDEX] O(1)
-    for (let i = 0; i < fingerprint.length; i++) {
-        const target = fingerprint[i];
-        
-        // 🌟 BẢN VÁ: Hỗ trợ cả AST Parser (số nguyên) và Cắm tay (chuỗi string)
-        let node;
-        if (typeof target.selector === 'number') {
-            node = dynamicNodes[target.selector]; 
+    fingerprint.forEach(target => {
+        // 🌟 BẢN VÁ: Kiểm tra xem chính thẻ root có khớp với selector không
+        // Nếu khớp thì lấy chính nó, nếu không thì mới lục tìm bên trong (querySelector)
+        let node = null;
+        if (root.matches && root.matches(target.selector)) {
+            node = root;
         } else {
             node = root.querySelector(target.selector);
         }
         
         if (node) {
-            // PLUGGED: Gắn bộ nhớ RAM vào thẻ DOM
+            // PLUGGED
             if (target.type === 'TEXT') {
                 if (node.childNodes.length === 0) node.appendChild(document.createTextNode(''));
                 domArray[target.idx] = node.firstChild;
@@ -494,13 +469,10 @@ export function hydrate(root, fingerprint, domArray, cacheArray) {
                 domArray[target.idx] = node;
             }
         } else {
-            console.error(`[Headless] Unplugged from start at index: ${target.selector}`);
+            console.error(`[Headless] Unplugged from start: ${target.selector}`);
         }
-        
         if (cacheArray) cacheArray[target.idx] = null;
-    };
-    
-    return dynamicNodes; // BẮT BUỘC TRẢ VỀ ĐỂ DÙNG CHUNG
+    });
 }
 
 // 🔌 UNPLUG: Đóng băng Logic và Ẩn Giao diện (Rút điện)
@@ -600,29 +572,27 @@ function initGlobalDelegation(eventName) {
 }
 
 // 3. Hàm đóng dấu DOM lúc Hydrate (Không gắn Listener nữa)
-export function bindEvents(root, EVENTS, mbId, dynamicNodes = []) {
+export function bindEvents(root, EVENTS, mbId) {
+    // Đóng dấu thẻ root để Trạm gác biết DOM này thuộc về cỗ máy nào
     if (root && root.setAttribute) {
         root.setAttribute('data-mb-id', mbId);
     }
 
     EVENTS.forEach(def => {
+        // Bật trạm gác cho loại sự kiện này (chỉ chạy 1 lần duy nhất cho toàn app)
         initGlobalDelegation(def.eventName);
         
+        // Tìm các phần tử đích và đóng mộc x-* lên chúng
         let elements = [];
-        
-        // Nhận diện nếu AST Parser trả về số nguyên
-        if (typeof def.selector === 'number') {
-            if (dynamicNodes[def.selector]) elements.push(dynamicNodes[def.selector]);
-        } 
-        // Logic cũ cho các string selector
-        else {
-            if (root.matches && root.matches(def.selector)) elements.push(root);
-            const children = root.querySelectorAll(def.selector);
-            for(let i=0; i<children.length; i++) elements.push(children[i]);
-        }
+        if (root.matches && root.matches(def.selector)) elements.push(root);
+        const children = root.querySelectorAll(def.selector);
+        for(let i=0; i<children.length; i++) elements.push(children[i]);
 
         elements.forEach(el => {
+            // Cú pháp x-* cực kỳ thân thiện với HTML
             el.setAttribute(`x-${def.eventName}`, def.actionName);
+            
+            // Lưu lại cách trích xuất dữ liệu
             if (def.inputs && def.inputs.length > 0) {
                 el.setAttribute('x-inputs', JSON.stringify(def.inputs));
             }

@@ -904,7 +904,6 @@ class CompilerContext {
             .filter(oldId => nodes[oldId].type === 'EFFECT') 
             .map(oldId => { 
                 const n = nodes[oldId]; const newId = oldToNew[oldId]; 
-                // 🌟 BẢN VÁ: selector bây giờ là số, không cần bọc trong dấu nháy kép nữa!
                 return { idx: memMap[newId], ...n.meta }; 
             });
 
@@ -949,17 +948,14 @@ const create${componentName} = (() => {
         U8.set([${initData.U8}]);
         GRAPH.set([${this.graphData.join(',')}]);
 
-        // Bắt lấy mảng DOM
-        const dynamicNodes = hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
+        hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
 
         Object.assign(actions, {
             ${actionsCode}
         });
 
         const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, ${exportedActionsCode}, actions, ${isActiveIndex});
-        
-        // Truyền mảng DOM vào
-        bindEvents(root, EVENTS, _mbId, dynamicNodes);
+        bindEvents(root, EVENTS, _mbId);
 
         for (let i = 0; i < COUNTS.totalNodes; i++) {
             const flagIdx = i >>> 5; const flagBit = 31 - (i & 31);
