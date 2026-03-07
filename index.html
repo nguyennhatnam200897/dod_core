@@ -330,15 +330,54 @@
         </div>
     </template>
 
-    <script>
-        // Hàm đồng bộ dữ liệu giỏ hàng từ Component ra bộ nhớ Toàn cục
-        window.syncCartData = function(id, addedQty) {
-            // Sử dụng đúng tên mảng RAM mà Dự án đã cấp phát trong build.js
+    <script type="module">
+        import { bootApp } from './app_compiled.js';
+        import { setDbStringMem } from './runtime_v44.js';
+
+        // 1. NGHIỆP VỤ CỦA DỰ ÁN: Cấp phát RAM và Tải Database
+        async function loadProjectData() {
+            console.log("[Project] Đang tải products.bin...");
+            const res = await fetch('./products.bin');
+            const buffer = await res.arrayBuffer();
+            const view = new DataView(buffer);
+            const N = view.getInt32(0, true);
+            const stringBytesLen = view.getInt32(4, true);
+            
+            let cursor = 8;
+            window.DB = {}; // Khởi tạo Schema của riêng dự án
+            window.DB.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
+            window.DB.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
+            window.DB.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
+            window.DB.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
+            window.DB.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
+            
+            // Cấp phát vùng nhớ cho Giỏ hàng (Động)
+            window.DB_CART_QTY = new Int32Array(N);
+            window.DB_DUMMY_ARRAY = new Array(N).fill(0);
+            
+            // Giao vùng nhớ chứa chuỗi Nhị phân lại cho Lõi Engine quản lý
+            const strMem = new Uint8Array(buffer, cursor, stringBytesLen);
+            setDbStringMem(strMem);
+            
+            console.log(`[Project] Đã nạp thành công ${N} sản phẩm vào RAM tĩnh.`);
+        }
+
+        // 2. HÀM ĐỒNG BỘ GIỎ HÀNG (Tương tác từ Component ra ngoài Web)
+        window.syncCartData = function(rowIndex, addedQty) {
             if (window.DB_CART_QTY) {
-                window.DB_CART_QTY[id] += addedQty;
+                window.DB_CART_QTY[rowIndex] += addedQty;
             }
         };
+
+        // 3. QUY TRÌNH BOOT ỨNG DỤNG
+        async function main() {
+            // Đảm bảo Data luôn được tải xong trước
+            await loadProjectData(); 
+            // Sau đó mới kích hoạt Bo mạch chủ của Engine
+            await bootApp();         
+        }
+
+        main();
     </script>
-    <script type="module" src="./app_compiled.js"></script>
 </body>
 </html>

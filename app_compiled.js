@@ -624,8 +624,8 @@ FLAGS_C[0] |= 16777216; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_R[
     }
 })();
 
-// --- KHỞI CHẠY HỆ THỐNG ---
-async function startApp() {
+// --- API KHỞI CHẠY ENGINE ---
+export async function bootApp() {
     await bootEngineWasm();
 
     window.mountComponents = () => {
@@ -640,34 +640,6 @@ async function startApp() {
     window.getDynamicString = getDynamicString;
     window.getDbString = getDbString;
     console.log("✅ Bo mạch chủ đã khởi động! Mọi Component đã sẵn sàng.");
-
-    // --- PROJECT BOOT SCRIPT ---
-    
-    console.log("[Project] Đang tải products.bin...");
-    const res = await fetch('./products.bin');
-    const buffer = await res.arrayBuffer();
-    const view = new DataView(buffer);
-    const N = view.getInt32(0, true);
-    const stringBytesLen = view.getInt32(4, true);
-    
-    let cursor = 8;
-    window.DB.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
-    window.DB.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    
-    const strMem = new Uint8Array(buffer, cursor, stringBytesLen);
-    setDbStringMem(strMem);
-    
-    window.DB_CART_QTY = new Int32Array(N);
-    window.DB_DUMMY_ARRAY = new Array(N).fill(0);
-    
-    console.log(`[Project] Đã nạp thành công ${N} sản phẩm vào RAM tĩnh.`);
-
-
     window.mountComponents();
     Router.init('#app-root', window.mountComponents);
 }
-
-startApp();

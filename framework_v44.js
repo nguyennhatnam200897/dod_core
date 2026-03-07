@@ -474,7 +474,7 @@ export const pool = (blueprint, size) => ({ isPool: true, blueprint, size });
 export const lazy = (blueprint, templateSelector) => ({ isLazy: true, blueprint, templateSelector });
 
 // --- TRÌNH LẮP RÁP ỨNG DỤNG (APP BUNDLER TỰ ĐỘNG) ---
-export const buildApp = (mountTargets, outputPath = './app_compiled.js', bootScript = '') => {
+export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
     // 🌟 1. Nhập thêm bootEngineWasm
     let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router, getDynamicString, STRING_ARENA, setDbStringMem, getDbString } from './runtime_v44.js';\n\n`;
     
@@ -494,12 +494,11 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js', bootScr
     // 🌟 BẢN VÁ: Đóng ngoặc khối lệnh
     combinedRustCode += `            _ => {}\n        }\n    }\n}\n`;
 
-    // 🌟 3. Bọc quá trình boot bằng Hàm Async để chờ WASM nạp xong
-    finalJSCode += `// --- KHỞI CHẠY HỆ THỐNG ---\n`;
-    finalJSCode += `async function startApp() {\n`;
+    // 🌟 MỚI: Export một hàm thay vì tự động chạy
+    finalJSCode += `// --- API KHỞI CHẠY ENGINE ---\n`;
+    finalJSCode += `export async function bootApp() {\n`;
     finalJSCode += `    await bootEngineWasm();\n\n`; 
 
-    // 🌟 BẢN VÁ: Gói việc Cắm điện vào một hàm dùng chung
     finalJSCode += `    window.mountComponents = () => {\n`;
     for (const [selector, target] of Object.entries(mountTargets)) {
         if (target.isPool) {
@@ -507,7 +506,6 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js', bootScr
         } else if (target.isLazy) {
             finalJSCode += `        Motherboard.registerLazy('${target.blueprint.name}', create${target.blueprint.name}, '${target.templateSelector}', '${selector}');\n`;
         } else {
-            // Kiểm tra thẻ HTML có tồn tại trên trang này không trước khi cắm điện
             finalJSCode += `        if (document.querySelector('${selector}')) create${target.name}(document.querySelector('${selector}'));\n`;
         }
     }
@@ -518,16 +516,14 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js', bootScr
     finalJSCode += `    window.getDynamicString = getDynamicString;\n`;
     finalJSCode += `    window.getDbString = getDbString;\n`;
     finalJSCode += `    console.log("✅ Bo mạch chủ đã khởi động! Mọi Component đã sẵn sàng.");\n`;
-    
-    // 🌟 CHÈN SCRIPT KHỞI TẠO CỦA RIÊNG DỰ ÁN VÀO ĐÂY
-    if (bootScript) {
-        finalJSCode += `\n    // --- PROJECT BOOT SCRIPT ---\n`;
-        finalJSCode += `    ${bootScript}\n\n`;
-    }
 
+    // 🌟 ĐÃ XÓA BOOTSCRIPT BẰNG STRING Ở ĐÂY
+    
     finalJSCode += `    window.mountComponents();\n`;
     finalJSCode += `    Router.init('#app-root', window.mountComponents);\n`;
-    finalJSCode += `}\n\nstartApp();\n`;
+    
+    // 🌟 ĐÃ XÓA LỆNH TỰ GỌI startApp()
+    finalJSCode += `}\n`;
 
     // 🌟 4. Ghi file JS
     fs.writeFileSync(outputPath, finalJSCode);

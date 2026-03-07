@@ -149,33 +149,9 @@ const ShopManager = blueprint('ShopManager', (g) => {
 // ==========================================
 // ĐÓNG GÓI VÀ XUẤT XƯỞNG DỰ ÁN
 // ==========================================
-const myProjectBootScript = `
-    console.log("[Project] Đang tải products.bin...");
-    const res = await fetch('./products.bin');
-    const buffer = await res.arrayBuffer();
-    const view = new DataView(buffer);
-    const N = view.getInt32(0, true);
-    const stringBytesLen = view.getInt32(4, true);
-    
-    let cursor = 8;
-    window.DB.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
-    window.DB.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    
-    const strMem = new Uint8Array(buffer, cursor, stringBytesLen);
-    setDbStringMem(strMem);
-    
-    window.DB_CART_QTY = new Int32Array(N);
-    window.DB_DUMMY_ARRAY = new Array(N).fill(0);
-    
-    console.log(\`[Project] Đã nạp thành công \${N} sản phẩm vào RAM tĩnh.\`);
-`;
-
 buildApp({
     'body': ShopManager,
     '#product-grid': pool(ProductItem, 20),
     '#cart-widget': Cart,
     '#modal-container': lazy(PopupModal, '#modal-tpl') 
-}, './app_compiled.js', myProjectBootScript);
+}, './app_compiled.js');
