@@ -597,8 +597,13 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
     try {
         // Build WASM siêu tốc
         execSync('wasm-pack build --target web', { stdio: 'inherit' });
+        
+        // 🌟 TÍCH HỢP TAILWIND V4 TỰ ĐỘNG
+        console.log("🎨 Đang dệt giao diện bằng Tailwind CSS v4...");
+        execSync('npx @tailwindcss/cli -i ./input.css -o ./public/style.css', { stdio: 'inherit' });
+        
         console.log(`🎉 HOÀN TẤT! Toàn bộ Engine đã sẵn sàng chiến đấu ở tốc độ Native!`);
     } catch (e) {
-        console.error("❌ Lỗi khi biên dịch WASM!", e.message);
+        console.error("❌ Lỗi khi biên dịch!", e.message);
     }
 };
