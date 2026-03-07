@@ -1,4 +1,4 @@
-import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from './runtime_v44.js';
+import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from '../runtime_v44.js';
 
 // --- COMPONENT: PlatformManager ---
 const createPlatformManager = (() => {

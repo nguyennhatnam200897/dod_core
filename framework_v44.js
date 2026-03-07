@@ -537,7 +537,7 @@ export const lazy = (blueprint, templateSelector) => ({ isLazy: true, blueprint,
 // --- TRÌNH LẮP RÁP ỨNG DỤNG (APP BUNDLER TỰ ĐỘNG) ---
 export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
     // 🌟 1. Nhập thêm bootEngineWasm
-    let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from './runtime_v44.js';\n\n`;
+    let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, DYNAMIC_STR, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router } from '../runtime_v44.js';\n\n`;
     
     // 🌟 BẢN VÁ: Gói TẤT CẢ Component vào ĐÚNG 1 HÀM execute_batch duy nhất
     let combinedRustCode = `// 🚀 FILE TỰ ĐỘNG SINH BỞI ENGINE DOD\nuse super::MotherboardCore;\n\nimpl MotherboardCore {\n    pub fn execute_batch(&mut self, chunk_id: usize, mut mask: u32) {\n        match self.comp_name.as_str() {\n`;

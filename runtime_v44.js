@@ -477,8 +477,13 @@ export function hydrate(root, fingerprint, domArray, cacheArray) {
     for (let i = 0; i < fingerprint.length; i++) {
         const target = fingerprint[i];
         
-        // Truy xuất mảng trực tiếp bằng index (target.selector bây giờ là con số)
-        const node = dynamicNodes[target.selector]; 
+        // 🌟 BẢN VÁ: Hỗ trợ cả AST Parser (số nguyên) và Cắm tay (chuỗi string)
+        let node;
+        if (typeof target.selector === 'number') {
+            node = dynamicNodes[target.selector]; 
+        } else {
+            node = root.querySelector(target.selector);
+        }
         
         if (node) {
             // PLUGGED: Gắn bộ nhớ RAM vào thẻ DOM
