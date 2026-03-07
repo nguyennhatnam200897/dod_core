@@ -89,21 +89,20 @@ buildApp({
 }, './public/app_compiled.js');
 
 // ==============================================================
-// 🌟 SSG INJECTOR: TỰ ĐỘNG TIÊM DOM BẰNG MARKER (BẤT TỬ)
+// 🌟 SSG INJECTOR: TÁCH BIỆT TEMPLATE VÀ OUTPUT (GIẢI PHÁP TRIỆT ĐỂ)
 // ==============================================================
 console.log("💉 Đang tiêm giao diện G2 Review vào index.html...");
-let indexHtml = fs.readFileSync('./public/index.html', 'utf-8');
 
-// 1. Tạo 20 thẻ từ file HTML đã biên dịch
+// 1. Đọc file GỐC từ thư mục templates (File này bất tử, không bao giờ bị hỏng)
+let templateHtml = fs.readFileSync('./templates/index.html', 'utf-8');
+
+// 2. Tạo 20 thẻ từ file HTML đã biên dịch
 const singleCard = `<div class="shop-wrapper absolute w-full left-0 pr-6">\n${global.SHOP_CARD_HTML}\n</div>\n`;
 const poolOfCards = singleCard.repeat(20);
 
-// 2. Thay thế chính xác phần ruột nằm giữa 2 mốc POOL_START và POOL_END
-// Cú pháp [\s\S]*? đảm bảo nó chỉ xóa phần thẻ bên trong, không đụng đến khung HTML bên ngoài
-indexHtml = indexHtml.replace(
-    /[\s\S]*?/,
-    `\n${poolOfCards}`
-);
+// 3. Thay thế thẻ đánh dấu bằng dữ liệu (Dùng string thay vì Regex)
+let finalHtml = templateHtml.replace('', poolOfCards);
 
-fs.writeFileSync('./public/index.html', indexHtml);
-console.log("✅ Tiêm SSG hoàn tất (Đã đúc chính xác 20 thẻ vào Object Pool)!");
+// 4. Xuất file ĐÃ TIÊM ra thư mục public để trình duyệt đọc
+fs.writeFileSync('./public/index.html', finalHtml);
+console.log("✅ Tiêm SSG hoàn tất (Đã đúc chính xác 20 thẻ vào public/index.html)!");
