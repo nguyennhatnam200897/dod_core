@@ -802,55 +802,99 @@ export function initObjectPool(compName, factoryFn, containerSelector, poolSize)
 }
 
 // ==============================================================
-// 🌟 TRÌNH ĐIỀU HƯỚNG SSG (SPA ROUTER)
+// 🌟 TRÌNH ĐIỀU HƯỚNG DOD (STATIC VIEW POOLING ROUTER)
 // ==============================================================
 export const Router = {
-    init: (containerSelector, mountCallback) => {
-        // Lắng nghe mọi cú click trên toàn trang
+    routes: {},             // Cấu hình bản đồ định tuyến
+    viewInstances: {},      // Kho chứa các Component đã được "Cắm rễ" (để giữ cho DOM bất tử)
+    activeViewName: null,   // Theo dõi trang đang được hiển thị
+
+    // Khởi tạo Router với danh sách các tuyến đường
+    init: (containerSelector, routesConfig) => {
+        Router.routes = routesConfig;
+        
+        // Lắng nghe mọi cú click trên toàn trang (Event Delegation)
         document.body.addEventListener('click', e => {
-            // Chỉ đánh chặn các thẻ <a> có thuộc tính data-link
             const a = e.target.closest('a[data-link]');
             if (a) {
                 e.preventDefault();
-                Router.navigate(a.href, containerSelector, true, mountCallback);
+                Router.navigate(a.getAttribute('href'), containerSelector, true);
             }
         });
         
         // Lắng nghe sự kiện Back/Forward của trình duyệt
         window.addEventListener('popstate', () => {
-            Router.navigate(location.pathname, containerSelector, false, mountCallback);
+            Router.navigate(location.pathname, containerSelector, false);
         });
+
+        // Kích hoạt trang đầu tiên ngay khi boot
+        Router.navigate(location.pathname, containerSelector, false);
     },
 
-    navigate: async (url, containerSelector, push, mountCallback) => {
-        if (push) history.pushState({}, "", url);
-        
+    navigate: async (path, containerSelector, push) => {
+        // 1. Tìm tuyến đường tương ứng (Fallback về 404 nếu không thấy)
+        const route = Router.routes[path] || Router.routes['/404'];
+        if (!route) {
+            console.error(`[Router DOD] Lỗi: Không tìm thấy route cho ${path}`);
+            return;
+        }
+
+        if (push) history.pushState({}, "", path);
+
+        const targetName = route.name;
         const container = document.querySelector(containerSelector);
         if (!container) return;
 
-        // 1. NGẮT ĐIỆN TOÀN BỘ COMPONENT CŨ (Thu hồi RAM Rust)
-        Motherboard.unplugTree(container);
-
-        try {
-            // 2. Tải trang tĩnh HTML (SSG)
-            const res = await fetch(url);
-            const html = await res.text();
-            
-            // 3. Bóc tách DOM mới
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newContent = doc.querySelector(containerSelector);
-            
-            // 4. Tráo DOM siêu tốc (Zero-Flicker)
-            if (newContent) container.innerHTML = newContent.innerHTML;
-
-            // 5. CẮM ĐIỆN LẠI CHO TRANG MỚI (Hydrate)
-            if (mountCallback) mountCallback();
-            Motherboard.wakeUp();
-            
-        } catch (err) {
-            console.error("[Router DOD] Lỗi chuyển trang:", err);
+        // -----------------------------------------------------------
+        // 🌟 GIAI ĐOẠN 1: NGỦ ĐÔNG (UNPLUG) TRANG HIỆN TẠI (O(1))
+        // -----------------------------------------------------------
+        if (Router.activeViewName && Router.activeViewName !== targetName) {
+            const oldInstance = Router.viewInstances[Router.activeViewName];
+            if (oldInstance && typeof oldInstance.unplug === 'function') {
+                // Rút điện RAM (Ghi số 0 vào mem.U8) và gán display: none
+                oldInstance.unplug(); 
+            }
         }
+
+        // -----------------------------------------------------------
+        // 🌟 GIAI ĐOẠN 2: THỨC TỈNH HOẶC CẮM RỄ TRANG MỚI
+        // -----------------------------------------------------------
+        let targetInstance = Router.viewInstances[targetName];
+
+        if (!targetInstance) {
+            // TRƯỜNG HỢP A: LẦN ĐẦU TIÊN TRUY CẬP (Lazy Allocation)
+            console.log(`[Router DOD] ⚡ Bơm RAM & Cắm rễ View: ${targetName}...`);
+            try {
+                // Gọi Dynamic Import để tải Chunk (JS + Chuỗi HTML)
+                const module = await route.fetcher();
+                
+                // Bơm HTML tĩnh vào cuối Container. Thao tác này chỉ tốn chi phí 1 LẦN DUY NHẤT.
+                container.insertAdjacentHTML('beforeend', module.html);
+                
+                // Lấy thẻ gốc (root node) vừa được bơm vào
+                const rootNode = container.lastElementChild;
+                
+                // Khởi tạo Component (Cấp phát RAM Rust, Hydrate, Đóng dấu Event)
+                // module.factory chính là hàm createXYZ mà compiler sinh ra
+                targetInstance = module.factory(rootNode);
+                
+                // Lưu vào kho để nó trở thành "Bất tử"
+                Router.viewInstances[targetName] = targetInstance;
+                
+            } catch (err) {
+                console.error(`[Router DOD] ❌ Lỗi tải chunk ${targetName}:`, err);
+                return;
+            }
+        } else {
+            // TRƯỜNG HỢP B: TỪ LẦN THỨ 2 TRỞ ĐI (Zero-Allocation Navigation)
+            // Lúc này không fetch, không parse HTML, chỉ ghi số 1 vào RAM.
+            // console.log(`[Router DOD] ♻️ Đánh thức View: ${targetName} (0ms)`);
+            targetInstance.plug();
+        }
+
+        // 3. Cập nhật trạng thái và ép Frame tiếp theo render
+        Router.activeViewName = targetName;
+        Motherboard.wakeUp();
     }
 };
 

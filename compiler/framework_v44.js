@@ -473,66 +473,67 @@ export const pool = (blueprint, size) => ({ isPool: true, blueprint, size });
 // 🌟 THÊM MỚI: Định nghĩa kiểu dữ liệu Lười biếng (Lazy/Template)
 export const lazy = (blueprint, templateSelector) => ({ isLazy: true, blueprint, templateSelector });
 
-// --- TRÌNH LẮP RÁP ỨNG DỤNG (APP BUNDLER TỰ ĐỘNG) ---
-export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
-    // 🌟 1. Nhập thêm bootEngineWasm
-    let finalJSCode = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, unplug, plug, Motherboard, initObjectPool, bootEngineWasm, Router, getDynamicString, STRING_ARENA, setDbStringMem, getDbString } from './runtime_v44.js';\n\n`;
+// --- BỘ BUNDLER TIẾN HÓA: CHUNKING & STATIC VIEW POOLING ---
+export const buildApp = (components, outputDir = './src/js/generated') => {
+    // 1. Đảm bảo thư mục đầu ra tồn tại
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
     
-    // 🌟 BẢN VÁ: Gói TẤT CẢ Component vào ĐÚNG 1 HÀM execute_batch duy nhất
+    // 2. Chuẩn bị vỏ bọc cho file Rust (Gom tất cả vào 1 não)
     let combinedRustCode = `// 🚀 FILE TỰ ĐỘNG SINH BỞI ENGINE DOD\nuse super::MotherboardCore;\n\nimpl MotherboardCore {\n    pub fn execute_batch(&mut self, chunk_id: usize, mut mask: u32) {\n        match self.comp_name.as_str() {\n`;
+    
     const uniqueComps = new Set();
-    Object.values(mountTargets).forEach(target => {
-        if (target.isPool || target.isLazy) uniqueComps.add(target.blueprint);
-        else uniqueComps.add(target);
+    
+    // Linh hoạt nhận vào Array hoặc Object mapping
+    const compList = Array.isArray(components) ? components : Object.values(components);
+    compList.forEach(comp => {
+        const target = comp.isPool || comp.isLazy ? comp.blueprint : comp;
+        uniqueComps.add(target);
     });
 
+    // 3. Xé lẻ từng Component thành các file JS độc lập (Chunks)
     uniqueComps.forEach(comp => { 
-        finalJSCode += comp.code.js + '\n\n'; 
-        combinedRustCode += comp.code.rust + '\n'; // Các nhánh rẽ được nhét vào đây
+        const compFileName = `${comp.name}.js`;
+        const compFilePath = `${outputDir}/${compFileName}`;
+        
+        // Cần import các hàm lõi từ runtime để Component có thể chạy
+        let jsChunk = `import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicString, retainDynamicString, releaseDynamicString, unplug, plug, Motherboard, getDynamicString } from '../runtime_v44.js';\n\n`;
+        
+        jsChunk += comp.code.js; // Bơm mã logic do Compiler sinh ra
+        
+        // Quan trọng: Export hàm khởi tạo ra ngoài để Router gọi lúc Lazy Load
+        jsChunk += `\nexport default create${comp.name};\n`;
+        
+        fs.writeFileSync(compFilePath, jsChunk);
+        console.log(`📦 Đã đóng gói Chunk JS: ${compFilePath}`);
+
+        // Gom mã rẽ nhánh của Rust
+        combinedRustCode += comp.code.rust + '\n'; 
     });
 
-    // 🌟 BẢN VÁ: Đóng ngoặc khối lệnh
     combinedRustCode += `            _ => {}\n        }\n    }\n}\n`;
 
-    // 🌟 MỚI: Export một hàm thay vì tự động chạy
-    finalJSCode += `// --- API KHỞI CHẠY ENGINE ---\n`;
-    finalJSCode += `export async function bootApp() {\n`;
-    finalJSCode += `    await bootEngineWasm();\n\n`; 
-
-    finalJSCode += `    window.mountComponents = () => {\n`;
-    for (const [selector, target] of Object.entries(mountTargets)) {
-        if (target.isPool) {
-            finalJSCode += `        if (document.querySelector('${selector}')) initObjectPool('${target.blueprint.name}', create${target.blueprint.name}, '${selector}', ${target.size});\n`;
-        } else if (target.isLazy) {
-            finalJSCode += `        Motherboard.registerLazy('${target.blueprint.name}', create${target.blueprint.name}, '${target.templateSelector}', '${selector}');\n`;
-        } else {
-            finalJSCode += `        if (document.querySelector('${selector}')) create${target.name}(document.querySelector('${selector}'));\n`;
-        }
-    }
-    finalJSCode += `    };\n\n`;
-
-    finalJSCode += `    window.MB = Motherboard;\n`;
-    finalJSCode += `    window.STRING_ARENA = STRING_ARENA;\n`;
-    finalJSCode += `    window.getDynamicString = getDynamicString;\n`;
-    finalJSCode += `    window.getDbString = getDbString;\n`;
-    finalJSCode += `    console.log("✅ Bo mạch chủ đã khởi động! Mọi Component đã sẵn sàng.");\n`;
-
-    // 🌟 ĐÃ XÓA BOOTSCRIPT BẰNG STRING Ở ĐÂY
+    // 4. Sinh file Core Bootloader (Chỉ chứa setup ban đầu, cực nhẹ)
+    const coreFilePath = `${outputDir}/core.js`;
+    let coreJS = `import { bootEngineWasm, Motherboard, STRING_ARENA, getDynamicString, getDbString } from '../runtime_v44.js';\n\n`;
+    coreJS += `// --- API KHỞI CHẠY ENGINE ---\n`;
+    coreJS += `export async function bootApp() {\n`;
+    coreJS += `    await bootEngineWasm();\n\n`; 
+    coreJS += `    window.MB = Motherboard;\n`;
+    coreJS += `    window.STRING_ARENA = STRING_ARENA;\n`;
+    coreJS += `    window.getDynamicString = getDynamicString;\n`;
+    coreJS += `    window.getDbString = getDbString;\n`;
+    coreJS += `    console.log("✅ DOD Engine: Bo mạch chủ đã khởi động! (Zero-Allocation Mode)");\n`;
+    coreJS += `}\n`;
     
-    finalJSCode += `    window.mountComponents();\n`;
-    finalJSCode += `    Router.init('#app-root', window.mountComponents);\n`;
-    
-    // 🌟 ĐÃ XÓA LỆNH TỰ GỌI startApp()
-    finalJSCode += `}\n`;
+    fs.writeFileSync(coreFilePath, coreJS);
+    console.log(`🔌 Đã sinh mã Bootloader: ${coreFilePath}`);
 
-    // 🌟 4. Ghi file JS
-    fs.writeFileSync(outputPath, finalJSCode);
-    console.log(`📝 Đã sinh mã Giao diện (JS): ${outputPath}`);
-
-    // 🌟 5. Ghi file Rust và tự động gọi wasm-pack
+    // 5. Ghi file Rust và tự động mài dũa WASM
     const rustFilePath = './rust_core/src/generated_compute.rs'; 
     fs.writeFileSync(rustFilePath, combinedRustCode);
-    console.log(`🦀 Đã sinh mã Lõi Tính toán (Rust): ${rustFilePath}`);
+    console.log(`🦀 Đã sinh mã Lõi Toán học (Rust): ${rustFilePath}`);
 
     console.log("⚙️ Đang mài dũa C++/Rust thành WebAssembly...");
     try {
@@ -540,9 +541,9 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
         execSync('wasm-pack build --target web --out-dir ../src/js/pkg', { 
             cwd: './rust_core', 
             stdio: 'inherit',
-            shell: true // 🌟 THÊM DÒNG NÀY ĐỂ WINDOWS KHÔNG BỊ LỖI ENOENT
+            shell: true
         });
-        console.log(`🎉 HOÀN TẤT! Toàn bộ Engine đã sẵn sàng chiến đấu ở tốc độ Native!`);
+        console.log(`🎉 HOÀN TẤT! Engine đã được nâng cấp lên kiến trúc View Bất tử!`);
     } catch (e) {
         console.error("❌ Lỗi khi biên dịch WASM!", e.message);
     }
