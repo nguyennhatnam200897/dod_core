@@ -1,4 +1,4 @@
-import { blueprint, buildApp, pool, lazy } from './framework_v44.js';
+import { blueprint, buildApp, pool, lazy } from './compiler/framework_v44.js';
 
 // ==========================================
 // COMPONENT 1: THẺ SẢN PHẨM (INDIRECTION ARRAY)
@@ -156,4 +156,4 @@ buildApp({
     '#product-grid': pool(ProductItem, 20),
     '#cart-widget': Cart,
     '#modal-container': lazy(PopupModal, '#modal-tpl') 
-}, './app_compiled.js');
+}, './public/js/app_compiled.js');
