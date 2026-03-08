@@ -187,70 +187,70 @@ function loadCartBuffer(db) {
 }
 
 // ==========================================
-// NGHIỆP VỤ DỰ ÁN
+// NGHIỆP VỤ DỰ ÁN (TIẾN TRÌNH KHỞI ĐỘNG 2 GIAI ĐOẠN)
 // ==========================================
-async function loadProjectData() {
-    console.log("[Project] Đang tải products.bin...");
-    const res = await fetch('./products.bin');
+
+// 🌟 1. HÀM LÕI: Tải và cắt file Nhị phân thành các mảng RAM
+// Hàm này dùng chung cho cả việc tải bản Lite (10KB) và bản Full (17MB)
+async function parseBinaryToRAM(url) {
+    console.log(`[Tiến trình] Đang tải ${url}...`);
+    const res = await fetch(url);
     const buffer = await res.arrayBuffer();
     const view = new DataView(buffer);
+    
     const N = view.getInt32(0, true);
-    const stringBytesLen = view.getInt32(4, true);
+    const NUM_TAGS = view.getInt32(4, true);
+    const stringBytesLen = view.getInt32(8, true);
+    const FLAT_INDICES_LEN = view.getInt32(12, true);
     
-    let cursor = 8;
-    window.DB = {}; 
-    window.DB.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
-    window.DB.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
-    window.DB.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    let cursor = 16;
+    const dbData = {}; 
     
-    setDbStringMem(new Uint8Array(buffer, cursor, stringBytesLen));
-    window.DB_DUMMY_ARRAY = new Array(N).fill(0);
-
-    // 🌟 1. TẠO CHỈ MỤC ĐẢO NGƯỢC (INVERTED INDEX) O(1)
-    window.TAG_INDEX = {
-        '#all': new Int32Array(N).map((_, i) => i), // Danh sách gốc: 0, 1, 2... N
-        '#sale': [],
-        '#sneaker': [],
-        '#aothun': []
-    };
-
-    // Giả lập Dữ liệu Hashtag ngẫu nhiên cho 100k sản phẩm
-    for(let i = 0; i < N; i++) {
-        if (i % 5 === 0) window.TAG_INDEX['#sale'].push(i);
-        if (i % 7 === 0) window.TAG_INDEX['#sneaker'].push(i);
-        if (i % 3 === 0) window.TAG_INDEX['#aothun'].push(i);
+    dbData.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
+    dbData.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    dbData.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    dbData.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    dbData.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
+    
+    const tOffsets = new Int32Array(buffer, cursor, NUM_TAGS); cursor += NUM_TAGS * 4;
+    const tLengths = new Int32Array(buffer, cursor, NUM_TAGS); cursor += NUM_TAGS * 4;
+    const tStarts = new Int32Array(buffer, cursor, NUM_TAGS); cursor += NUM_TAGS * 4;
+    const tCounts = new Int32Array(buffer, cursor, NUM_TAGS); cursor += NUM_TAGS * 4;
+    const flatIndices = new Int32Array(buffer, cursor, FLAT_INDICES_LEN); cursor += FLAT_INDICES_LEN * 4;
+    
+    const strMem = new Uint8Array(buffer, cursor, stringBytesLen);
+    
+    const tagIndex = {};
+    const decoder = new TextDecoder();
+    for(let i = 0; i < NUM_TAGS; i++) {
+        const tagName = decoder.decode(strMem.subarray(tOffsets[i], tOffsets[i] + tLengths[i]));
+        tagIndex[tagName] = flatIndices.subarray(tStarts[i], tStarts[i] + tCounts[i]);
     }
 
-    // Ép kiểu mảng rác JS thành Mảng Nhị phân O(1) để tối ưu RAM
-    window.TAG_INDEX['#sale'] = new Int32Array(window.TAG_INDEX['#sale']);
-    window.TAG_INDEX['#sneaker'] = new Int32Array(window.TAG_INDEX['#sneaker']);
-    window.TAG_INDEX['#aothun'] = new Int32Array(window.TAG_INDEX['#aothun']);
+    return { N, dbData, strMem, tagIndex };
+}
 
-    // Mảng Tham Chiếu (Indirection Array) đang hiển thị hiện tại
-    window.CURRENT_VIEW_INDICES = window.TAG_INDEX['#all'];
-
-    // 🌟 KHÔI PHỤC RAM TỪ INDEXED DB
-    window.cartDb = await initCartDB();
-    const savedBuffer = await loadCartBuffer(window.cartDb);
+// 🌟 2. HÀM HOT-SWAP: Rút phích cắm cục RAM cũ, cắm cục RAM mới vào
+async function setupEnvironment(parsedData) {
+    window.DB = parsedData.dbData;
+    setDbStringMem(parsedData.strMem);
+    window.TAG_INDEX = parsedData.tagIndex;
+    window.DB_DUMMY_ARRAY = new Array(parsedData.N).fill(0);
     
-    // Nếu đã từng lưu và kích thước file không đổi
-    if (savedBuffer && savedBuffer.byteLength === N * 4) {
-        window.DB_CART_QTY = new Int32Array(savedBuffer); // Ép thẳng cục Byte vào RAM (Zero-Parse)
-        console.log("♻️ Đã khôi phục giỏ hàng nhị phân (0ms).");
-    } else {
-        window.DB_CART_QTY = new Int32Array(N); // Cấp phát mới
+    // BẢO TỒN GIỎ HÀNG: Khi tráo RAM từ Lite sang Full, ta phải chép lại dữ liệu Giỏ hàng 
+    // mà khách vừa bấm mua trong lúc chờ tải bản Full sang cục RAM mới.
+    const oldCart = window.DB_CART_QTY;
+    window.DB_CART_QTY = new Int32Array(parsedData.N);
+    if (oldCart) {
+        window.DB_CART_QTY.set(oldCart.subarray(0, Math.min(oldCart.length, parsedData.N)));
     }
 }
 
+// Hàm lưu giỏ hàng xuống ổ cứng (Giữ nguyên)
 let saveTimeout;
 window.syncCartData = function(rowIndex, addedQty) {
     if (window.DB_CART_QTY) {
         window.DB_CART_QTY[rowIndex] += addedQty;
-        
-        // 🌟 THUẬT TOÁN DEBOUNCE LƯU NỀN
-        // Không lưu liên tục gây hại ổ cứng, chờ user ngừng bấm 500ms mới Dump RAM 1 lần
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
             saveCartBuffer(window.cartDb, window.DB_CART_QTY.buffer);
@@ -258,43 +258,63 @@ window.syncCartData = function(rowIndex, addedQty) {
     }
 };
 
-// 🌟 2. HÀM TÌM KIẾM SIÊU TỐC O(1)
+// 🌟 3. HÀM TÌM KIẾM SIÊU TỐC
+window.CURRENT_TAG = '#all'; // Ghi nhớ Tag người dùng đang xem
 window.filterByTag = function(tag) {
     if (!window.TAG_INDEX[tag]) return;
+    window.CURRENT_TAG = tag; // Ghi nhớ lại
     
-    // 1. Tráo con trỏ RAM (Chi phí thời gian: 0ms)
     window.CURRENT_VIEW_INDICES = window.TAG_INDEX[tag];
-    
-    // 2. Báo cho Bo mạch chủ (Engine) render lại Virtual Scroll với danh sách mới
     window.MB.initVirtualScroll('ProductItem', '#product-grid', window.CURRENT_VIEW_INDICES, 140, (instanceMbId, rowData, rowIndex) => {
         window.MB.sendSignal(instanceMbId, "V_INDEX", rowIndex);
     });
     
-    // 3. Reset thanh cuộn về đầu và cập nhật nhãn
     document.getElementById('product-grid').scrollTop = 0;
     document.getElementById('tag-label').innerText = `${tag} (${window.CURRENT_VIEW_INDICES.length} món)`;
 };
 
+// 🌟 4. TIẾN TRÌNH KHỞI ĐỘNG CHÍNH
 async function main() {
-    await loadProjectData();
+    // ---- GIAI ĐOẠN 1: FAST BOOT ----
+    // Tải bản LITE cực nhanh (140 sản phẩm đầu tiên)
+    const liteData = await parseBinaryToRAM('./public/products_lite.bin');
+    await setupEnvironment(liteData);
+    
+    // Khởi động Ổ cứng và khôi phục Giỏ hàng cũ (nếu có)
+    window.cartDb = await initCartDB();
+    const savedBuffer = await loadCartBuffer(window.cartDb);
+    if (savedBuffer) window.DB_CART_QTY.set(new Int32Array(savedBuffer).subarray(0, liteData.N));
+
+    // Kích hoạt giao diện
+    window.CURRENT_VIEW_INDICES = window.TAG_INDEX['#all'];
     TextureManager.init();
     ParticleManager.init();
     await bootApp();         
 
-    // 🌟 ĐỒNG BỘ HIỂN THỊ GIỎ HÀNG LÚC KHỞI ĐỘNG
-    let totalQ = 0;
-    let totalS = 0;
+    // Hiển thị Giỏ hàng lên UI ngay lập tức
+    let totalQ = 0; let totalS = 0;
     for(let i = 0; i < window.DB_CART_QTY.length; i++) {
         const q = window.DB_CART_QTY[i];
-        if (q > 0) {
-            totalQ += q;
-            totalS += q * window.DB.prices[i];
-        }
+        if (q > 0) { totalQ += q; totalS += q * window.DB.prices[i]; }
     }
-    
-    // Bơm số vào cho Component Cart xử lý giao diện
-    if (totalQ > 0) {
-        window.MB.callAction('Cart', 'SYNC_CART_ACTION', totalQ, Math.floor(totalS));
+    if (totalQ > 0) window.MB.callAction('Cart', 'SYNC_CART_ACTION', totalQ, Math.floor(totalS));
+
+    console.log("🚀 Giao diện đã sẵn sàng (Fast Boot). Đang tải nền dữ liệu Full...");
+
+    // ---- GIAI ĐOẠN 2: BACKGROUND LOAD & HOT-SWAP ----
+    // Tải bản Full 17MB ở chế độ nền mà không làm đơ trang Web
+    try {
+        const fullData = await parseBinaryToRAM('./public/products_full.bin');
+        
+        // Tráo đổi cục RAM trong lúc Engine vẫn đang chạy mượt mà
+        await setupEnvironment(fullData);
+        
+        // Kích hoạt lại bộ lọc hiện tại để ép Engine dọn Cache và chọc vào vùng RAM mới
+        window.filterByTag(window.CURRENT_TAG);
+        
+        console.log("🔥 Đã Hot-Swap thành công dữ liệu Full (17MB) mà không làm gián đoạn UI!");
+    } catch (e) {
+        console.error("Lỗi tải nền dữ liệu Full:", e);
     }
 }
 
