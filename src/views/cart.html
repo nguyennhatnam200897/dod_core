@@ -1,0 +1,24 @@
+<div style="width: 100%; display: flex; justify-content: center; align-items: flex-start;">
+    <div id="cart-widget" class="sidebar">
+        <h2 style="margin: 0; color: #10b981;">🛒 Giỏ hàng của bạn</h2>
+        
+        <div class="summary-row"><span>Số lượng món:</span><strong id="cart-qty">0</strong></div>
+        <div class="summary-row"><span>Tạm tính:</span><strong id="cart-subtotal">0 đ</strong></div>
+        
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <strong style="font-size: 14px;">Mã giảm giá (Thử gõ: VIP2026 hoặc FREESHIP)</strong>
+            <div class="promo-box">
+                <input type="text" id="promo-input" placeholder="Nhập mã...">
+            </div>
+        </div>
+
+        <div class="summary-row" style="color: #10b981;"><span>Khuyến mãi:</span><strong id="cart-discount">0 đ</strong></div>
+        <div class="summary-row" style="color: #64748b;"><span>VAT (8%):</span><strong id="cart-vat">0 đ</strong></div>
+        
+        <div class="summary-row" style="font-size: 20px; color: #ef4444; font-weight: 900; border: none; margin-top: 10px;">
+            <span>TỔNG TIỀN:</span><strong id="cart-final">0 đ</strong>
+        </div>
+
+        <button id="btn-checkout" style="padding: 15px; background: #ef4444; color: white; font-weight: bold; border-radius: 8px; border: none; font-size: 16px; cursor: pointer; display: none;">TIẾN HÀNH THANH TOÁN</button>
+    </div>
+</div>

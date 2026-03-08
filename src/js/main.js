@@ -1,9 +1,9 @@
-import { bootApp } from './app_compiled.js';
+import { bootApp } from './generated/core.js';
+import { Router, Motherboard } from './runtime_v44.js';
 import { TextureManager, ParticleManager } from './graphics.js';
 import { initCartDB, saveCartBuffer, loadCartBuffer } from './storage.js';
 import { parseStaticBin, parseDynamicBin, setupEnvironment } from './data.js';
 
-// Quản lý Giỏ hàng (Giữ nguyên)
 let saveTimeout;
 window.syncCartData = function(rowIndex, addedQty) {
     if (window.DB_CART_QTY) {
@@ -13,7 +13,6 @@ window.syncCartData = function(rowIndex, addedQty) {
     }
 };
 
-// Tìm kiếm Hashtag (Giữ nguyên)
 window.CURRENT_TAG = '#all';
 window.filterByTag = function(tag) {
     if (!window.TAG_INDEX[tag]) return;
@@ -22,13 +21,36 @@ window.filterByTag = function(tag) {
     window.MB.initVirtualScroll('ProductItem', '#product-grid', window.CURRENT_VIEW_INDICES, 140, (instanceMbId, rowData, rowIndex) => {
         window.MB.sendSignal(instanceMbId, "V_INDEX", rowIndex);
     });
-    document.getElementById('product-grid').scrollTop = 0;
-    document.getElementById('tag-label').innerText = `${tag} (${window.CURRENT_VIEW_INDICES.length} món)`;
+    const grid = document.getElementById('product-grid');
+    if (grid) grid.scrollTop = 0;
+    const label = document.getElementById('tag-label');
+    if (label) label.innerText = `${tag} (${window.CURRENT_VIEW_INDICES.length} món)`;
 };
 
-// 🌟 4. TIẾN TRÌNH KHỞI ĐỘNG CHÍNH
+const appRoutes = {
+    '/': { 
+        name: 'HomeView',
+        fetcher: async () => {
+            const [js, html] = await Promise.all([
+                import('./generated/HomeView.js'), 
+                import('../views/home.html?raw') // Vite dodHtmlLoader sẽ biến cái này thành String
+            ]);
+            return { factory: js.default, html: html.default };
+        }
+    },
+    '/cart': {
+        name: 'Cart',
+        fetcher: async () => {
+            const [js, html] = await Promise.all([
+                import('./generated/Cart.js'), 
+                import('../views/cart.html?raw')
+            ]);
+            return { factory: js.default, html: html.default };
+        }
+    }
+};
+
 async function main() {
-    // Dùng Promise.all để tải Lạnh và Nóng song song
     const [staticLite, dynamicLite] = await Promise.all([
         parseStaticBin('./data/static_lite.bin'),
         parseDynamicBin('./data/dynamic_lite.bin')
@@ -45,22 +67,49 @@ async function main() {
     ParticleManager.init();
     await bootApp();         
 
+    // Khởi tạo Lazy Component: Modal và Product Pool
+    import('./generated/PopupModal.js').then(m => {
+        Motherboard.registerLazy('PopupModal', m.default, '#modal-tpl', '#modal-container');
+    });
+    
+    import('./generated/ProductItem.js').then(m => {
+        // Chỉ tạo Pool khi user đang ở trang Home (có thẻ #product-grid)
+        const initPool = () => {
+            if (document.querySelector('#product-grid')) {
+                Motherboard.initObjectPool('ProductItem', m.default, '#product-grid', 20);
+                window.removeEventListener('DOMNodeInserted', initPool);
+            }
+        };
+        if (document.querySelector('#product-grid')) initPool();
+        else window.addEventListener('DOMNodeInserted', initPool); // Đợi Router cắm thẻ vào
+    });
+
+    // Kích hoạt Router
+    Router.init('#app-root', appRoutes);
+
+    // Đồng bộ số lượng giỏ hàng ban đầu
     let totalQ = 0; let totalS = 0;
     for(let i = 0; i < window.DB_CART_QTY.length; i++) {
         const q = window.DB_CART_QTY[i];
         if (q > 0) { totalQ += q; totalS += q * window.DB.prices[i]; }
     }
-    if (totalQ > 0) window.MB.callAction('Cart', 'SYNC_CART_ACTION', totalQ, Math.floor(totalS));
+    
+    // Ép tạo Cart instance ngầm (Headless) để nó nhận dữ liệu ngay cả khi chưa vào trang /cart
+    if (totalQ > 0) {
+        import('./generated/Cart.js').then(m => {
+            const tempDiv = document.createElement('div');
+            tempDiv.style.display = 'none';
+            document.body.appendChild(tempDiv);
+            m.default(tempDiv); // Hydrate Headless
+            Motherboard.callAction('Cart', 'SYNC_CART_ACTION', totalQ, Math.floor(totalS));
+        });
+    }
 
     console.log("🚀 Fast Boot đã xong! Đang tải Full Data...");
 
-    // TẢI NỀN BẢN FULL (Tách Nóng Lạnh)
     try {
         const [staticFull, dynamicFull] = await Promise.all([
-            // Tải bản Lạnh (Mặc định sẽ được Trình duyệt Cache vĩnh viễn)
             parseStaticBin('./data/static_full.bin'),
-            
-            // 🌟 CACHE BUSTER CHO BẢN NÓNG: Ép trình duyệt luôn kéo giá và tồn kho mới nhất
             parseDynamicBin('./data/dynamic_full.bin?t=' + Date.now()) 
         ]);
         
