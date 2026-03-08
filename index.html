@@ -30,7 +30,9 @@
         .btn-buy { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-buy:active { transform: scale(0.95); }
         .btn-disabled { background: #cbd5e1 !important; cursor: not-allowed !important; color: #94a3b8 !important; transform: none !important; }
-
+        /* 🌟 THÊM MỚI CSS NÀY: Dành riêng cho nút Hashtag */
+        .btn-tag { padding: 8px 15px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-tag:active { transform: scale(0.95); }
         /* CỘT PHẢI: GIỎ HÀNG THÔNG MINH */
         .sidebar { width: 350px; background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 15px; }
         .summary-row { display: flex; justify-content: space-between; font-size: 16px; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
@@ -41,252 +43,445 @@
         @keyframes pop { to { transform: scale(1); } }
         .btn-close-modal { padding: 12px 30px; background: #64748b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; width: 100%; transition: 0.2s; }
         .btn-close-modal:hover { background: #475569; }
+        /* ==========================================
+           HỆ THỐNG HẠT (PARTICLES) 
+           ========================================== */
+        .particle {
+            position: fixed;
+            top: 0; left: 0;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            pointer-events: none; /* Xuyên qua chuột */
+            z-index: 9999;
+            opacity: 0;
+            transform: translate(-100px, -100px) scale(0.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            /* Bật Hardware Acceleration cho Hạt */
+            will-change: transform, opacity; 
+        }
+        
+        /* Quỹ đạo bay cong và gia tốc (Easing) */
+        .particle.flying {
+            transition: 
+                transform 0.6s cubic-bezier(0.5, -0.5, 0.2, 1), /* Bay vòng cung nhẹ */
+                opacity 0.6s ease-in;
+        }
     </style>
 </head>
 <body>
 
     <div class="main-col">
-        <div class="header"><h2>🚀 Kho Hàng: 100.000 Sản phẩm</h2></div>
+        <div class="header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;">🚀 Kho Hàng: <span id="tag-label">#all (100000 món)</span></h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-tag" onclick="window.filterByTag('#all')">#all</button>
+                    <button class="btn-tag" style="background: #f59e0b" onclick="window.filterByTag('#sale')">#sale</button>
+                    <button class="btn-tag" style="background: #10b981" onclick="window.filterByTag('#sneaker')">#sneaker</button>
+                    <button class="btn-tag" style="background: #8b5cf6" onclick="window.filterByTag('#aothun')">#aothun</button>
+                </div>
+            </div>
+        </div>
         
         <div id="product-grid" style="overflow-y: auto; position: relative; will-change: transform;">
             <div class="virtual-spacer" style="width: 1px; position: absolute; height: 1.4e+07px;"></div>
             
             <div class="virtual-wrapper" style="--y: 0px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00001</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 140px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00002</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">493000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">3</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 280px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00003</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">269000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 420px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00004</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">301000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">2</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 560px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00005</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">233000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 700px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00006</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">440000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">18</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 840px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00007</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">130000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">16</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 980px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00008</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">321000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">1</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1120px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01469</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">388000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">5</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1260px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01470</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">216000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">16</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1400px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01471</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">169000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">15</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1540px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #01472</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">183000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">1</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1680px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00933</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">265000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">7</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1820px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00934</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">544000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">7</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 1960px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00935</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">226000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">6</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 2100px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: block;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00936</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">129000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">0</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
-                    <button class="btn-buy btn-disabled" disabled="">Thêm vào giỏ</button>
+                    <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 2240px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00937</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">122000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 2380px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: block;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00938</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">523000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">4</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 2520px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00939</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">265000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
             </div>
             <div class="virtual-wrapper" style="--y: 2660px;">
                 <div class="product-card">
-                    <div>
-                        <div class="badge-out" style="display: none;">HẾT HÀNG</div>
-                        <div class="badge-low" style="display: none;">SẮP HẾT</div>
-                        <div class="product-name" style="font-weight: bold; font-size: 18px;">Món hàng #00400</div>
-                        <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">524000 đ</div>
-                        <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">19</span></div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        
+                        <div style="position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #e2e8f0; flex-shrink: 0;">
+                            <canvas class="product-canvas" width="80" height="80" style="position: absolute; top: 0; left: 0;"></canvas>
+                            <div class="tex-id" style="display: none;"></div>
+                        </div>
+                        
+                        <div>
+                            <div class="badge-out" style="display: none;">HẾT HÀNG</div>
+                            <div class="badge-low" style="display: none;">SẮP HẾT</div>
+                            <div class="product-name" style="font-weight: bold; font-size: 18px;">Sản phẩm siêu tốc 0</div>
+                            <div class="product-price" style="color: #ef4444; margin-top: 8px; font-size: 16px;">351000 đ</div>
+                            <div style="font-size: 13px; color: #64748b; margin-top: 5px;">Kho: <span class="product-stock">10</span></div>
+                        </div>
                     </div>
                     <button class="btn-buy">Thêm vào giỏ</button>
                 </div>
@@ -330,54 +525,6 @@
         </div>
     </template>
 
-    <script type="module">
-        import { bootApp } from './app_compiled.js';
-        import { setDbStringMem } from './runtime_v44.js';
-
-        // 1. NGHIỆP VỤ CỦA DỰ ÁN: Cấp phát RAM và Tải Database
-        async function loadProjectData() {
-            console.log("[Project] Đang tải products.bin...");
-            const res = await fetch('./products.bin');
-            const buffer = await res.arrayBuffer();
-            const view = new DataView(buffer);
-            const N = view.getInt32(0, true);
-            const stringBytesLen = view.getInt32(4, true);
-            
-            let cursor = 8;
-            window.DB = {}; // Khởi tạo Schema của riêng dự án
-            window.DB.ids = new Int32Array(buffer, cursor, N); cursor += N * 4;
-            window.DB.prices = new Float64Array(buffer, cursor, N); cursor += N * 8;
-            window.DB.stocks = new Int32Array(buffer, cursor, N); cursor += N * 4;
-            window.DB.nameOffsets = new Int32Array(buffer, cursor, N); cursor += N * 4;
-            window.DB.nameLengths = new Int32Array(buffer, cursor, N); cursor += N * 4;
-            
-            // Cấp phát vùng nhớ cho Giỏ hàng (Động)
-            window.DB_CART_QTY = new Int32Array(N);
-            window.DB_DUMMY_ARRAY = new Array(N).fill(0);
-            
-            // Giao vùng nhớ chứa chuỗi Nhị phân lại cho Lõi Engine quản lý
-            const strMem = new Uint8Array(buffer, cursor, stringBytesLen);
-            setDbStringMem(strMem);
-            
-            console.log(`[Project] Đã nạp thành công ${N} sản phẩm vào RAM tĩnh.`);
-        }
-
-        // 2. HÀM ĐỒNG BỘ GIỎ HÀNG (Tương tác từ Component ra ngoài Web)
-        window.syncCartData = function(rowIndex, addedQty) {
-            if (window.DB_CART_QTY) {
-                window.DB_CART_QTY[rowIndex] += addedQty;
-            }
-        };
-
-        // 3. QUY TRÌNH BOOT ỨNG DỤNG
-        async function main() {
-            // Đảm bảo Data luôn được tải xong trước
-            await loadProjectData(); 
-            // Sau đó mới kích hoạt Bo mạch chủ của Engine
-            await bootApp();         
-        }
-
-        main();
-    </script>
+    <script type="module" src="./main.js"></script>
 </body>
 </html>

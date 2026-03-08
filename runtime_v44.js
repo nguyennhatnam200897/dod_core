@@ -324,8 +324,20 @@ export const Motherboard = {
 
         pool._updateData = (newData) => {
             currentData = newData;
+            
+            // 🌟 BẢN VÁ: KỸ THUẬT CACHE INVALIDATION (PHÁ CACHE)
+            // Ép toàn bộ thẻ sản phẩm trong Pool "quên" vị trí cũ bằng index -1
+            for (let i = 0; i < pool.poolSize; i++) {
+                const inst = pool.instances[i];
+                if (inst._dataIndex !== -1) {
+                    // Gửi -1 vào hệ thống để phá Cache của Lõi Toán học
+                    mappingFn(inst._mbId, null, -1);
+                    inst._dataIndex = -1; // Phá Cache của Virtual Scroll
+                }
+            }
+            
             container.scrollTop = 0; 
-            renderFrame(true);       
+            renderFrame(true); // Ép render lại mảng mới cực mạnh
         };
 
         // 🌟 TỐI ƯU 2: Bỏ requestAnimationFrame bao bọc bên ngoài!

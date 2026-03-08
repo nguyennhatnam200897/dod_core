@@ -38,8 +38,8 @@ const createShopManager = (() => {
 
         Object.assign(actions, {
             act_0: () => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-Motherboard.initVirtualScroll("ProductItem", "#product-grid", window.DB_DUMMY_ARRAY, 140, (instanceMbId, rowData, rowIndex) => {
-  Motherboard.sendSignal(instanceMbId, "ROW_INDEX", rowIndex);
+Motherboard.initVirtualScroll("ProductItem", "#product-grid", window.CURRENT_VIEW_INDICES, 140, (instanceMbId, rowData, rowIndex) => {
+  Motherboard.sendSignal(instanceMbId, "V_INDEX", rowIndex);
 });
 Motherboard.wakeUp(); }
         });
@@ -91,11 +91,11 @@ Motherboard.wakeUp(); }
 
 // --- COMPONENT: ProductItem ---
 const createProductItem = (() => {
-    const COUNTS = {"f64":1,"i32":28,"u8":1,"sinks":8,"totalNodes":37,"graphSize":7};
-    const FINGERPRINT = [{"idx":0,"type":"TRANSFORM_Y","selector":".virtual-wrapper"},{"idx":1,"type":"TEXT","selector":".product-name"},{"idx":2,"type":"TEXT","selector":".product-price"},{"idx":3,"type":"TEXT","selector":".product-stock"},{"idx":4,"type":"SHOW","selector":".badge-out","displayStyle":"block"},{"idx":5,"type":"SHOW","selector":".badge-low","displayStyle":"block"},{"idx":6,"type":"ATTR","selector":".btn-buy"},{"idx":7,"type":"CLASS","selector":".btn-buy","className":"btn-disabled"}];
+    const COUNTS = {"f64":1,"i32":29,"u8":1,"sinks":9,"totalNodes":39,"graphSize":0};
+    const FINGERPRINT = [{"idx":0,"type":"TRANSFORM_Y","selector":".virtual-wrapper"},{"idx":1,"type":"TEXT","selector":".tex-id"},{"idx":2,"type":"TEXT","selector":".product-name"},{"idx":3,"type":"TEXT","selector":".product-price"},{"idx":4,"type":"TEXT","selector":".product-stock"},{"idx":5,"type":"SHOW","selector":".badge-out","displayStyle":"block"},{"idx":6,"type":"SHOW","selector":".badge-low","displayStyle":"block"},{"idx":7,"type":"ATTR","selector":".btn-buy"},{"idx":8,"type":"CLASS","selector":".btn-buy","className":"btn-disabled"}];
     const LUT = [""," đ"];
     const EVENTS = [{"selector":".btn-buy","eventName":"click","actionName":"act_0","inputs":[]}];
-    const SINKS = [1,6,8,16,19,25,26,27];
+    const SINKS = [1,5,9,11,19,22,28,29,30];
 
     // Các hàm tính toán c_exec_x được giữ lại dưới dạng "dự phòng", 
     // trong thực tế khi chạy WASM, mảng này không còn được đụng tới nữa.
@@ -103,19 +103,16 @@ const createProductItem = (() => {
  const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
 let v=0, _res=0;
  
- if (mask & 268435456) { v = (DB.nameOffsets[I32[1]]) | 0; if (I32[2] !== v) {   I32[2] = v; mask |= 67108864; }  } 
-if (mask & 134217728) { v = (DB.nameLengths[I32[1]]) | 0; if (I32[3] !== v) {   I32[3] = v; mask |= 67108864; }  } 
-if (mask & 67108864) { v = (setDynamicString(getDbString(I32[2], I32[3]))) | 0; if (I32[4] !== v) {   if (v < 0) retainDynamicString(v);   if (I32[4] < 0) releaseDynamicString(I32[4]);   I32[4] = v; FLAGS_R[0] |= 33554432; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; }  } 
-if (mask & 16777216) { v = +(DB.prices[I32[1]]); if (F64[0] !== v) {   F64[0] = v; FLAGS_R[0] |= 8388608; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; }  } 
-if (mask & 4194304) { v = (DB.stocks[I32[1]]) | 0; if (I32[5] !== v) {   I32[5] = v; FLAGS_C[0] |= 65536; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_C[0] |= 8; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
-if (mask & 262144) { v = (window.DB_CART_QTY[I32[1]]) | 0; if (I32[9] !== v) {   I32[9] = v; FLAGS_C[0] |= 131072; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
+ if (mask & 268435456) { v = (window.CURRENT_VIEW_INDICES[I32[1]]) | 0; if (I32[2] !== v) {   I32[2] = v; mask |= 187203584; FLAGS_C[0] |= 131072; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
+if (mask & 134217728) { v = (window.DB.ids[I32[2]]) | 0; if (I32[3] !== v) {   I32[3] = v; FLAGS_R[0] |= 67108864; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; }  } 
+if (mask & 33554432) { v = (window.DB.nameOffsets[I32[2]]) | 0; if (I32[4] !== v) {   I32[4] = v; mask |= 8388608; }  } 
+if (mask & 16777216) { v = (window.DB.nameLengths[I32[2]]) | 0; if (I32[5] !== v) {   I32[5] = v; mask |= 8388608; }  } 
+if (mask & 8388608) { v = (setDynamicString(getDbString(I32[4], I32[5]))) | 0; if (I32[6] !== v) {   if (v < 0) retainDynamicString(v);   if (I32[6] < 0) releaseDynamicString(I32[6]);   I32[6] = v; FLAGS_R[0] |= 4194304; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; }  } 
+if (mask & 2097152) { v = +(window.DB.prices[I32[2]]); if (F64[0] !== v) {   F64[0] = v; FLAGS_R[0] |= 1048576; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; }  } 
+if (mask & 524288) { v = (window.DB.stocks[I32[2]]) | 0; if (I32[7] !== v) {   I32[7] = v; FLAGS_C[0] |= 8192; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_C[0] |= 1; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
+if (mask & 32768) { v = (window.DB_CART_QTY[I32[2]]) | 0; if (I32[11] !== v) {   I32[11] = v; FLAGS_C[0] |= 16384; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
  };
-const c_exec_1 = (mem, mask) => { 
- const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
-let v=0, _res=0;
- 
- if (mask & 268435456) { v = (DB.ids[I32[1]]) | 0; if (I32[26] !== v) {   I32[26] = v; }  } 
- };
+const c_exec_1 = null;
     const r_exec_0 = (mem, mask) => { 
  const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
 let v=0, _res=0;
@@ -127,8 +124,8 @@ if (CACHE[0] !== val) {
   } else { DOM[0].style.setProperty('--y', val + "px"); }
   CACHE[0] = val; 
 } } 
-if (mask & 33554432) { 
-                    const textVal = (I32[4] >= 0 ? (LUT[I32[4]] || LUT[0]) : getDynamicString(I32[4]));
+if (mask & 67108864) { 
+                    const textVal = String(I32[3]);
                     if (CACHE[1] !== textVal) { 
                         if (CACHE[1] === null) {
                             if (DOM[1].textContent !== String(textVal)) DOM[1].textContent = textVal;
@@ -138,8 +135,8 @@ if (mask & 33554432) {
                         CACHE[1] = textVal; 
                     }
                  } 
-if (mask & 8388608) { 
-                    const textVal = String(F64[0]) + (LUT[1] || LUT[0]);
+if (mask & 4194304) { 
+                    const textVal = (I32[6] >= 0 ? (LUT[I32[6]] || LUT[0]) : getDynamicString(I32[6]));
                     if (CACHE[2] !== textVal) { 
                         if (CACHE[2] === null) {
                             if (DOM[2].textContent !== String(textVal)) DOM[2].textContent = textVal;
@@ -149,8 +146,8 @@ if (mask & 8388608) {
                         CACHE[2] = textVal; 
                     }
                  } 
-if (mask & 32768) { 
-                    const textVal = String(I32[11]);
+if (mask & 1048576) { 
+                    const textVal = String(F64[0]) + (LUT[1] || LUT[0]);
                     if (CACHE[3] !== textVal) { 
                         if (CACHE[3] === null) {
                             if (DOM[3].textContent !== String(textVal)) DOM[3].textContent = textVal;
@@ -160,17 +157,18 @@ if (mask & 32768) {
                         CACHE[3] = textVal; 
                     }
                  } 
-if (mask & 4096) { const val = I32[13];
-if (CACHE[4] !== val) { 
-  const targetStyle = val ? "block" : "none";
-  if (CACHE[4] === null) {
-    if (DOM[4].style.display !== targetStyle) DOM[4].style.display = targetStyle;
-  } else {
-    DOM[4].style.display = targetStyle;
-  }
-  CACHE[4] = val; 
-} } 
-if (mask & 64) { const val = I32[18];
+if (mask & 4096) { 
+                    const textVal = String(I32[13]);
+                    if (CACHE[4] !== textVal) { 
+                        if (CACHE[4] === null) {
+                            if (DOM[4].textContent !== String(textVal)) DOM[4].textContent = textVal;
+                        } else {
+                            DOM[4].textContent = textVal;
+                        }
+                        CACHE[4] = textVal; 
+                    }
+                 } 
+if (mask & 512) { const val = I32[15];
 if (CACHE[5] !== val) { 
   const targetStyle = val ? "block" : "none";
   if (CACHE[5] === null) {
@@ -180,29 +178,39 @@ if (CACHE[5] !== val) {
   }
   CACHE[5] = val; 
 } } 
-if (mask & 32) { const val = I32[13];
+if (mask & 8) { const val = I32[20];
 if (CACHE[6] !== val) { 
+  const targetStyle = val ? "block" : "none";
   if (CACHE[6] === null) {
-    const hasAttr = DOM[6].hasAttribute('disabled');
-    if (val && !hasAttr) DOM[6].setAttribute('disabled', '');
-    else if (!val && hasAttr) DOM[6].removeAttribute('disabled');
+    if (DOM[6].style.display !== targetStyle) DOM[6].style.display = targetStyle;
   } else {
-    if (val) DOM[6].setAttribute('disabled', '');
-    else DOM[6].removeAttribute('disabled');
+    DOM[6].style.display = targetStyle;
   }
   CACHE[6] = val; 
 } } 
-if (mask & 16) { const val = I32[13];
+if (mask & 4) { const val = I32[15];
 if (CACHE[7] !== val) { 
   if (CACHE[7] === null) {
-    const hasClass = DOM[7].classList.contains("btn-disabled");
-    if (val && !hasClass) DOM[7].classList.add("btn-disabled");
-    else if (!val && hasClass) DOM[7].classList.remove("btn-disabled");
+    const hasAttr = DOM[7].hasAttribute('disabled');
+    if (val && !hasAttr) DOM[7].setAttribute('disabled', '');
+    else if (!val && hasAttr) DOM[7].removeAttribute('disabled');
   } else {
-    if (val) DOM[7].classList.add("btn-disabled");
-    else DOM[7].classList.remove("btn-disabled");
+    if (val) DOM[7].setAttribute('disabled', '');
+    else DOM[7].removeAttribute('disabled');
   }
   CACHE[7] = val; 
+} } 
+if (mask & 2) { const val = I32[15];
+if (CACHE[8] !== val) { 
+  if (CACHE[8] === null) {
+    const hasClass = DOM[8].classList.contains("btn-disabled");
+    if (val && !hasClass) DOM[8].classList.add("btn-disabled");
+    else if (!val && hasClass) DOM[8].classList.remove("btn-disabled");
+  } else {
+    if (val) DOM[8].classList.add("btn-disabled");
+    else DOM[8].classList.remove("btn-disabled");
+  }
+  CACHE[8] = val; 
 } } 
  };
 const r_exec_1 = null;
@@ -215,11 +223,11 @@ r_exec_0, r_exec_1
 ];
 
     const EXPORTED_PORTS = {
-  "ROW_INDEX": { 
+  "V_INDEX": { 
     id: 1, 
     type: "I32", 
     semantic: "I32", 
-    propagate: (mem) => { const { FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH } = mem; markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 0, 7);  } 
+    propagate: (mem) => { const { FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH } = mem; FLAGS_C[0] |= 268435456; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648;  } 
   },
   "TRANSFORM_Y": { 
     id: 0, 
@@ -236,25 +244,25 @@ r_exec_0, r_exec_1
         const { F64, I32, U8, DOM, CACHE, GRAPH, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R } = mem; 
         
         F64.set([0]); 
-        I32.set([0,0,0,0,0,0,-1,0,0,0,0,0,0,0,0,0,5,0,0,0,1,0,0,0,0,0,0,0]); 
+        I32.set([0,0,0,0,0,0,0,0,-1,0,0,0,0,0,0,0,0,0,5,0,0,0,1,0,0,0,0,0,0]); 
         U8.set([1]);
-        GRAPH.set([35,7,9,3,4,13,11]);
+        GRAPH.set([]);
 
         hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
 
         Object.assign(actions, {
             act_0: () => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-const _disp_0_arg_0 = ((((((((I32[6] === I32[1] ? 1 : 0)) ? I32[8] : (window.DB_CART_QTY[I32[1]]))) < (DB.stocks[I32[1]]) ? 1 : 0)) ? I32[20] : I32[21]));
-const _disp_0_arg_1 = (DB.prices[I32[1]]);
-const _disp_1_arg_0 = (((((((DB.stocks[I32[1]]) - ((((I32[6] === I32[1] ? 1 : 0)) ? I32[8] : (window.DB_CART_QTY[I32[1]]))))) - ((((((((I32[6] === I32[1] ? 1 : 0)) ? I32[8] : (window.DB_CART_QTY[I32[1]]))) < (DB.stocks[I32[1]]) ? 1 : 0)) ? I32[20] : I32[21])))) <= I32[24] ? 1 : 0));
-const _disp_1_arg_1 = (setDynamicString(getDbString((DB.nameOffsets[I32[1]]), (DB.nameLengths[I32[1]]))));
-const _disp_2_arg_0 = I32[1];
-const _disp_2_arg_1 = ((((((((I32[6] === I32[1] ? 1 : 0)) ? I32[8] : (window.DB_CART_QTY[I32[1]]))) < (DB.stocks[I32[1]]) ? 1 : 0)) ? I32[20] : I32[21]));
-const _tempVal_9 = I32[1];
-I32[6] = (_tempVal_9) | 0;
-FLAGS_C[0] |= 1048576; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; const _tempVal_10 = ((((((I32[6] === I32[1] ? 1 : 0)) ? I32[8] : (window.DB_CART_QTY[I32[1]]))) + ((((((((I32[6] === I32[1] ? 1 : 0)) ? I32[8] : (window.DB_CART_QTY[I32[1]]))) < (DB.stocks[I32[1]]) ? 1 : 0)) ? I32[20] : I32[21]))));
+const _disp_0_arg_0 = ((((((((I32[8] === (window.CURRENT_VIEW_INDICES[I32[1]]) ? 1 : 0)) ? I32[10] : (window.DB_CART_QTY[(window.CURRENT_VIEW_INDICES[I32[1]])]))) < (window.DB.stocks[(window.CURRENT_VIEW_INDICES[I32[1]])]) ? 1 : 0)) ? I32[22] : I32[23]));
+const _disp_0_arg_1 = (window.DB.prices[(window.CURRENT_VIEW_INDICES[I32[1]])]);
+const _disp_1_arg_0 = (((((((window.DB.stocks[(window.CURRENT_VIEW_INDICES[I32[1]])]) - ((((I32[8] === (window.CURRENT_VIEW_INDICES[I32[1]]) ? 1 : 0)) ? I32[10] : (window.DB_CART_QTY[(window.CURRENT_VIEW_INDICES[I32[1]])]))))) - ((((((((I32[8] === (window.CURRENT_VIEW_INDICES[I32[1]]) ? 1 : 0)) ? I32[10] : (window.DB_CART_QTY[(window.CURRENT_VIEW_INDICES[I32[1]])]))) < (window.DB.stocks[(window.CURRENT_VIEW_INDICES[I32[1]])]) ? 1 : 0)) ? I32[22] : I32[23])))) <= I32[26] ? 1 : 0));
+const _disp_1_arg_1 = (setDynamicString(getDbString((window.DB.nameOffsets[(window.CURRENT_VIEW_INDICES[I32[1]])]), (window.DB.nameLengths[(window.CURRENT_VIEW_INDICES[I32[1]])]))));
+const _disp_2_arg_0 = (window.CURRENT_VIEW_INDICES[I32[1]]);
+const _disp_2_arg_1 = ((((((((I32[8] === (window.CURRENT_VIEW_INDICES[I32[1]]) ? 1 : 0)) ? I32[10] : (window.DB_CART_QTY[(window.CURRENT_VIEW_INDICES[I32[1]])]))) < (window.DB.stocks[(window.CURRENT_VIEW_INDICES[I32[1]])]) ? 1 : 0)) ? I32[22] : I32[23]));
+const _tempVal_10 = (window.CURRENT_VIEW_INDICES[I32[1]]);
 I32[8] = (_tempVal_10) | 0;
-FLAGS_C[0] |= 131072; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; Motherboard.callAction("Cart", "ADD_ITEM_ACTION", _disp_0_arg_0, _disp_0_arg_1);
+FLAGS_C[0] |= 131072; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; const _tempVal_11 = ((((((I32[8] === (window.CURRENT_VIEW_INDICES[I32[1]]) ? 1 : 0)) ? I32[10] : (window.DB_CART_QTY[(window.CURRENT_VIEW_INDICES[I32[1]])]))) + ((((((((I32[8] === (window.CURRENT_VIEW_INDICES[I32[1]]) ? 1 : 0)) ? I32[10] : (window.DB_CART_QTY[(window.CURRENT_VIEW_INDICES[I32[1]])]))) < (window.DB.stocks[(window.CURRENT_VIEW_INDICES[I32[1]])]) ? 1 : 0)) ? I32[22] : I32[23]))));
+I32[10] = (_tempVal_11) | 0;
+FLAGS_C[0] |= 16384; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; Motherboard.callAction("Cart", "ADD_ITEM_ACTION", _disp_0_arg_0, _disp_0_arg_1);
 Motherboard.callAction("PopupModal", "TRIGGER_ACTION", _disp_1_arg_0, _disp_1_arg_1 >= 0 ? (LUT[_disp_1_arg_1] || LUT[0]) : getDynamicString(_disp_1_arg_1));
 if (typeof window["syncCartData"] === 'function') window["syncCartData"](_disp_2_arg_0, _disp_2_arg_1);
 Motherboard.wakeUp(); }
@@ -273,7 +281,7 @@ Motherboard.wakeUp(); }
         Motherboard.enqueue(_mbId);
         Motherboard.wakeUp();
 
-        const STR_INDICES = [4];
+        const STR_INDICES = [6];
 
         
 
@@ -303,7 +311,7 @@ Motherboard.wakeUp(); }
 
 // --- COMPONENT: Cart ---
 const createCart = (() => {
-    const COUNTS = {"f64":5,"i32":29,"u8":1,"sinks":7,"totalNodes":41,"graphSize":4};
+    const COUNTS = {"f64":5,"i32":31,"u8":1,"sinks":7,"totalNodes":43,"graphSize":8};
     const FINGERPRINT = [{"idx":0,"type":"VALUE","selector":"#promo-input"},{"idx":1,"type":"TEXT","selector":"#cart-qty"},{"idx":2,"type":"TEXT","selector":"#cart-subtotal"},{"idx":3,"type":"TEXT","selector":"#cart-discount"},{"idx":4,"type":"TEXT","selector":"#cart-vat"},{"idx":5,"type":"TEXT","selector":"#cart-final"},{"idx":6,"type":"SHOW","selector":"#btn-checkout","displayStyle":"block"}];
     const LUT = ["","VIP2026","FREESHIP"," đ"];
     const EVENTS = [{"selector":"#promo-input","eventName":"input","actionName":"act_0","inputs":[{"path":["value"],"expectedType":"STR"}]}];
@@ -428,9 +436,9 @@ r_exec_0, r_exec_1
         const { F64, I32, U8, DOM, CACHE, GRAPH, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R } = mem; 
         
         F64.set([0,0,0,0,0]); 
-        I32.set([0,0,0,1,0,20,0,100,0,2,0,30000,0,0,0,0,0,8,0,100,0,0,0,0,0,0,0,0,0]); 
+        I32.set([0,0,0,1,0,20,0,100,0,2,0,30000,0,0,0,0,0,8,0,100,0,0,0,0,0,0,0,0,0,0,0]); 
         U8.set([1]);
-        GRAPH.set([9,19,21,40]);
+        GRAPH.set([9,19,21,40,9,19,21,40]);
 
         hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
 
@@ -455,10 +463,18 @@ FLAGS_C[1] |= 33554432; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; const _te
 I32[1] = (_tempVal_0) | 0;
 FLAGS_C[0] |= 1; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_C[1] |= 134217728; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_R[0] |= 268435456; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; const _tempVal_1 = ((I32[2] + ((((I32[25]) * F64[2])))));
 I32[2] = (_tempVal_1) | 0;
-markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 0, 4); FLAGS_R[0] |= 67108864; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); }
+markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 0, 4); FLAGS_R[0] |= 67108864; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); },
+    act_2: (totalQ, totalS) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
+I32[29] = totalQ;
+I32[30] = totalS;
+const _tempVal_0 = I32[29];
+I32[1] = (_tempVal_0) | 0;
+FLAGS_C[0] |= 1; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_C[1] |= 134217728; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_R[0] |= 268435456; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; const _tempVal_1 = I32[30];
+I32[2] = (_tempVal_1) | 0;
+markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 4, 8); FLAGS_R[0] |= 67108864; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); }
         });
 
-        const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, {"ADD_ITEM_ACTION":"act_1"}, actions, 0);
+        const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, {"ADD_ITEM_ACTION":"act_1","SYNC_CART_ACTION":"act_2"}, actions, 0);
         bindEvents(root, EVENTS, _mbId);
 
         for (let i = 0; i < COUNTS.totalNodes; i++) {
