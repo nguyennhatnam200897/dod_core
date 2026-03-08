@@ -530,14 +530,18 @@ export const buildApp = (mountTargets, outputPath = './app_compiled.js') => {
     console.log(`📝 Đã sinh mã Giao diện (JS): ${outputPath}`);
 
     // 🌟 5. Ghi file Rust và tự động gọi wasm-pack
-    const rustFilePath = './src/generated_compute.rs'; 
+    const rustFilePath = './rust_core/src/generated_compute.rs'; 
     fs.writeFileSync(rustFilePath, combinedRustCode);
     console.log(`🦀 Đã sinh mã Lõi Tính toán (Rust): ${rustFilePath}`);
 
     console.log("⚙️ Đang mài dũa C++/Rust thành WebAssembly...");
     try {
         // Build WASM siêu tốc
-        execSync('wasm-pack build --target web', { stdio: 'inherit' });
+        execSync('wasm-pack build --target web --out-dir ../src/js/pkg', { 
+            cwd: './rust_core', 
+            stdio: 'inherit',
+            shell: true // 🌟 THÊM DÒNG NÀY ĐỂ WINDOWS KHÔNG BỊ LỖI ENOENT
+        });
         console.log(`🎉 HOÀN TẤT! Toàn bộ Engine đã sẵn sàng chiến đấu ở tốc độ Native!`);
     } catch (e) {
         console.error("❌ Lỗi khi biên dịch WASM!", e.message);
