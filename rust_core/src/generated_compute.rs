@@ -13,88 +13,127 @@ impl MotherboardCore {
             "Cart" => {
                 match chunk_id {
                     0 => {
-                        if (mask & (1 << 21)) != 0 {
-                            let v = ((self.i32_mem[2] * self.i32_mem[5])) as i32;
-                            if self.i32_mem[6] != v {
-                                self.i32_mem[6] = v;
-                                mask |= 1 << 19;
+                        if (mask & (1 << 24)) != 0 {
+                            let v = ((self.f64_mem[0] * self.f64_mem[1])) as f64;
+                            if self.f64_mem[2] != v {
+                                self.f64_mem[2] = v;
+                                mask |= 1 << 20;
                             }
                         }
-                        if (mask & (1 << 19)) != 0 {
-                            let v = ((self.i32_mem[6] as f64 / self.i32_mem[7] as f64)) as f64;
-                            if self.f64_mem[0] != v {
-                                self.f64_mem[0] = v;
-                                mask |= 1 << 18;
+                        if (mask & (1 << 21)) != 0 {
+                            let v = (self.i32_mem[3] as f64) as f64;
+                            if self.f64_mem[3] != v {
+                                self.f64_mem[3] = v;
+                                mask |= 1 << 20;
+                            }
+                        }
+                        if (mask & (1 << 20)) != 0 {
+                            let v = ((self.f64_mem[2] * self.f64_mem[3])) as f64;
+                            if self.f64_mem[4] != v {
+                                self.f64_mem[4] = v;
+                                mask |= 1 << 13;
                             }
                         }
                         if (mask & (1 << 18)) != 0 {
-                            let v = (self.f64_mem[0] as i32) as i32;
-                            if self.i32_mem[8] != v {
-                                self.i32_mem[8] = v;
-                                mask |= 1 << 12;
+                            let v = (self.i32_mem[4] as f64) as f64;
+                            if self.f64_mem[5] != v {
+                                self.f64_mem[5] = v;
+                                mask |= 1 << 14;
+                            }
+                        }
+                        if (mask & (1 << 15)) != 0 {
+                            let v = (self.i32_mem[6] as f64) as f64;
+                            if self.f64_mem[6] != v {
+                                self.f64_mem[6] = v;
+                                mask |= 1 << 14;
+                            }
+                        }
+                        if (mask & (1 << 14)) != 0 {
+                            let v = ((self.f64_mem[5] * self.f64_mem[6])) as f64;
+                            if self.f64_mem[7] != v {
+                                self.f64_mem[7] = v;
+                                mask |= 1 << 13;
                             }
                         }
                         if (mask & (1 << 13)) != 0 {
-                            let v = (if self.i32_mem[10] != 0 { self.i32_mem[11] } else { self.i32_mem[12] }) as i32;
-                            if self.i32_mem[13] != v {
-                                self.i32_mem[13] = v;
+                            let v = ((self.f64_mem[4] + self.f64_mem[7])) as f64;
+                            if self.f64_mem[8] != v {
+                                self.f64_mem[8] = v;
                                 mask |= 1 << 12;
+                                mask |= 1 << 6;
                             }
                         }
                         if (mask & (1 << 12)) != 0 {
-                            let v = (if self.i32_mem[4] != 0 { self.i32_mem[8] } else { self.i32_mem[13] }) as i32;
-                            if self.i32_mem[14] != v {
-                                self.i32_mem[14] = v;
+                            let v = (if self.f64_mem[8] > self.f64_mem[0] { 1 } else { 0 }) as i32;
+                            if self.i32_mem[7] != v {
+                                self.i32_mem[7] = v;
                                 mask |= 1 << 11;
                             }
                         }
                         if (mask & (1 << 11)) != 0 {
-                            let v = ((self.i32_mem[14]).min(self.i32_mem[2])) as i32;
-                            if self.i32_mem[15] != v {
-                                self.i32_mem[15] = v;
-                                mask |= 1 << 9;
-                                self.flags_r[0] |= 1 << 10;
-                                self.l2_r[0] |= 1 << 31;
-                                self.l1_r[0] |= 1 << 31;
+                            let v = (self.i32_mem[7] as f64) as f64;
+                            if self.f64_mem[9] != v {
+                                self.f64_mem[9] = v;
+                                mask |= 1 << 7;
+                                mask |= 1 << 10;
                             }
                         }
-                        if (mask & (1 << 9)) != 0 {
-                            let v = ((self.i32_mem[2] - self.i32_mem[15])) as i32;
-                            if self.i32_mem[16] != v {
-                                self.i32_mem[16] = v;
+                        if (mask & (1 << 10)) != 0 {
+                            let v = ((self.f64_mem[9] * self.f64_mem[0])) as f64;
+                            if self.f64_mem[10] != v {
+                                self.f64_mem[10] = v;
+                                mask |= 1 << 5;
+                            }
+                        }
+                        if (mask & (1 << 8)) != 0 {
+                            let v = (self.i32_mem[8] as f64) as f64;
+                            if self.f64_mem[11] != v {
+                                self.f64_mem[11] = v;
                                 mask |= 1 << 7;
-                                mask |= 1 << 2;
                             }
                         }
                         if (mask & (1 << 7)) != 0 {
-                            let v = ((self.i32_mem[16] * self.i32_mem[17])) as i32;
-                            if self.i32_mem[18] != v {
-                                self.i32_mem[18] = v;
+                            let v = ((self.f64_mem[11] - self.f64_mem[9])) as f64;
+                            if self.f64_mem[12] != v {
+                                self.f64_mem[12] = v;
+                                mask |= 1 << 6;
+                            }
+                        }
+                        if (mask & (1 << 6)) != 0 {
+                            let v = ((self.f64_mem[12] * self.f64_mem[8])) as f64;
+                            if self.f64_mem[13] != v {
+                                self.f64_mem[13] = v;
                                 mask |= 1 << 5;
                             }
                         }
                         if (mask & (1 << 5)) != 0 {
-                            let v = ((self.i32_mem[18] as f64 / self.i32_mem[19] as f64)) as f64;
-                            if self.f64_mem[1] != v {
-                                self.f64_mem[1] = v;
-                                mask |= 1 << 4;
-                            }
-                        }
-                        if (mask & (1 << 4)) != 0 {
-                            let v = (self.f64_mem[1] as i32) as i32;
-                            if self.i32_mem[20] != v {
-                                self.i32_mem[20] = v;
-                                mask |= 1 << 2;
-                                self.flags_r[0] |= 1 << 3;
+                            let v = ((self.f64_mem[10] + self.f64_mem[13])) as f64;
+                            if self.f64_mem[14] != v {
+                                self.f64_mem[14] = v;
+                                mask |= 1 << 3;
+                                self.flags_r[0] |= 1 << 4;
                                 self.l2_r[0] |= 1 << 31;
                                 self.l1_r[0] |= 1 << 31;
                             }
                         }
-                        if (mask & (1 << 2)) != 0 {
-                            let v = ((self.i32_mem[16] + self.i32_mem[20])) as i32;
-                            if self.i32_mem[21] != v {
-                                self.i32_mem[21] = v;
-                                self.flags_r[0] |= 1 << 1;
+                        if (mask & (1 << 3)) != 0 {
+                            let v = ((self.f64_mem[0] - self.f64_mem[14])) as f64;
+                            if self.f64_mem[15] != v {
+                                self.f64_mem[15] = v;
+                                mask |= 1 << 1;
+                                self.flags_c[1] |= 1 << 31;
+                                self.l2_c[0] |= 1 << 30;
+                                self.l1_c[0] |= 1 << 31;
+                            }
+                        }
+                        if (mask & (1 << 1)) != 0 {
+                            let v = ((self.f64_mem[15] * self.f64_mem[16])) as f64;
+                            if self.f64_mem[17] != v {
+                                self.f64_mem[17] = v;
+                                self.flags_c[1] |= 1 << 31;
+                                self.l2_c[0] |= 1 << 30;
+                                self.l1_c[0] |= 1 << 31;
+                                self.flags_r[0] |= 1 << 0;
                                 self.l2_r[0] |= 1 << 31;
                                 self.l1_r[0] |= 1 << 31;
                             }
@@ -102,45 +141,12 @@ impl MotherboardCore {
                     },
                     1 => {
                         if (mask & (1 << 31)) != 0 {
-                            let v = (if self.i32_mem[1] > self.i32_mem[22] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[23] != v {
-                                self.i32_mem[23] = v;
+                            let v = ((self.f64_mem[15] + self.f64_mem[17])) as f64;
+                            if self.f64_mem[18] != v {
+                                self.f64_mem[18] = v;
                                 self.flags_r[1] |= 1 << 30;
                                 self.l2_r[0] |= 1 << 30;
                                 self.l1_r[0] |= 1 << 31;
-                            }
-                        }
-                        if (mask & (1 << 26)) != 0 {
-                            let v = ((self.i32_mem[1] + self.i32_mem[25])) as i32;
-                            if self.i32_mem[26] != v {
-                                self.i32_mem[26] = v;
-                            }
-                        }
-                        if (mask & (1 << 25)) != 0 {
-                            let v = (self.i32_mem[25] as f64) as f64;
-                            if self.f64_mem[3] != v {
-                                self.f64_mem[3] = v;
-                                mask |= 1 << 24;
-                            }
-                        }
-                        if (mask & (1 << 24)) != 0 {
-                            let v = ((self.f64_mem[3] * self.f64_mem[2])) as f64;
-                            if self.f64_mem[4] != v {
-                                self.f64_mem[4] = v;
-                                mask |= 1 << 23;
-                            }
-                        }
-                        if (mask & (1 << 23)) != 0 {
-                            let v = (self.f64_mem[4] as i32) as i32;
-                            if self.i32_mem[27] != v {
-                                self.i32_mem[27] = v;
-                                mask |= 1 << 22;
-                            }
-                        }
-                        if (mask & (1 << 22)) != 0 {
-                            let v = ((self.i32_mem[2] + self.i32_mem[27])) as i32;
-                            if self.i32_mem[28] != v {
-                                self.i32_mem[28] = v;
                             }
                         }
                     },
@@ -171,116 +177,45 @@ impl MotherboardCore {
             "ProductItem" => {
                 match chunk_id {
                     0 => {
-                        if (mask & (1 << 17)) != 0 {
-                            let v = (if self.i32_mem[8] == self.i32_mem[2] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[9] != v {
-                                self.i32_mem[9] = v;
-                                mask |= 1 << 14;
-                            }
-                        }
-                        if (mask & (1 << 14)) != 0 {
-                            let v = (if self.i32_mem[9] != 0 { self.i32_mem[10] } else { self.i32_mem[11] }) as i32;
-                            if self.i32_mem[12] != v {
-                                self.i32_mem[12] = v;
-                                mask |= 1 << 13;
-                                mask |= 1 << 0;
-                                self.flags_c[1] |= 1 << 25;
-                                self.l2_c[0] |= 1 << 30;
-                                self.l1_c[0] |= 1 << 31;
-                            }
-                        }
-                        if (mask & (1 << 13)) != 0 {
-                            let v = ((self.i32_mem[7] - self.i32_mem[12])) as i32;
-                            if self.i32_mem[13] != v {
-                                self.i32_mem[13] = v;
-                                mask |= 1 << 10;
-                                mask |= 1 << 7;
-                                mask |= 1 << 5;
-                                self.flags_r[0] |= 1 << 12;
+                        if (mask & (1 << 23)) != 0 {
+                            let v = ((self.i32_mem[2] - self.i32_mem[3])) as i32;
+                            if self.i32_mem[4] != v {
+                                self.i32_mem[4] = v;
+                                mask |= 1 << 20;
+                                self.flags_r[0] |= 1 << 22;
                                 self.l2_r[0] |= 1 << 31;
                                 self.l1_r[0] |= 1 << 31;
-                                self.flags_c[1] |= 1 << 28;
-                                self.l2_c[0] |= 1 << 30;
-                                self.l1_c[0] |= 1 << 31;
+                                mask |= 1 << 12;
                             }
                         }
-                        if (mask & (1 << 10)) != 0 {
-                            let v = (if self.i32_mem[13] <= self.i32_mem[14] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[15] != v {
-                                self.i32_mem[15] = v;
-                                self.flags_r[0] |= 1 << 9;
+                        if (mask & (1 << 20)) != 0 {
+                            let v = (if self.i32_mem[4] <= self.i32_mem[5] { 1 } else { 0 }) as i32;
+                            if self.i32_mem[6] != v {
+                                self.i32_mem[6] = v;
+                                self.flags_r[0] |= 1 << 19;
                                 self.l2_r[0] |= 1 << 31;
                                 self.l1_r[0] |= 1 << 31;
-                                self.flags_r[0] |= 1 << 2;
+                                self.flags_r[0] |= 1 << 18;
                                 self.l2_r[0] |= 1 << 31;
                                 self.l1_r[0] |= 1 << 31;
-                                self.flags_r[0] |= 1 << 1;
+                                self.flags_r[0] |= 1 << 17;
                                 self.l2_r[0] |= 1 << 31;
                                 self.l1_r[0] |= 1 << 31;
                             }
                         }
-                        if (mask & (1 << 7)) != 0 {
-                            let v = (if self.i32_mem[13] > self.i32_mem[16] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[17] != v {
-                                self.i32_mem[17] = v;
-                                mask |= 1 << 4;
-                            }
-                        }
-                        if (mask & (1 << 5)) != 0 {
-                            let v = (if self.i32_mem[13] <= self.i32_mem[18] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[19] != v {
-                                self.i32_mem[19] = v;
-                                mask |= 1 << 4;
-                            }
-                        }
-                        if (mask & (1 << 4)) != 0 {
-                            let v = (if self.i32_mem[17] != 0 && self.i32_mem[19] != 0 { 1 } else { 0 }) as i32;
-                            if self.i32_mem[20] != v {
-                                self.i32_mem[20] = v;
-                                self.flags_r[0] |= 1 << 3;
-                                self.l2_r[0] |= 1 << 31;
-                                self.l1_r[0] |= 1 << 31;
-                            }
-                        }
-                        if (mask & (1 << 0)) != 0 {
-                            let v = (if self.i32_mem[12] < self.i32_mem[7] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[21] != v {
-                                self.i32_mem[21] = v;
-                                self.flags_c[1] |= 1 << 29;
-                                self.l2_c[0] |= 1 << 30;
-                                self.l1_c[0] |= 1 << 31;
+                        if (mask & (1 << 12)) != 0 {
+                            let v = (if self.i32_mem[4] > self.i32_mem[10] { 1 } else { 0 }) as i32;
+                            if self.i32_mem[11] != v {
+                                self.i32_mem[11] = v;
                             }
                         }
                     },
-                    1 => {
-                        if (mask & (1 << 29)) != 0 {
-                            let v = (if self.i32_mem[21] != 0 { self.i32_mem[22] } else { self.i32_mem[23] }) as i32;
-                            if self.i32_mem[24] != v {
-                                self.i32_mem[24] = v;
-                                mask |= 1 << 28;
-                                mask |= 1 << 25;
-                            }
-                        }
-                        if (mask & (1 << 28)) != 0 {
-                            let v = ((self.i32_mem[13] - self.i32_mem[24])) as i32;
-                            if self.i32_mem[25] != v {
-                                self.i32_mem[25] = v;
-                                mask |= 1 << 26;
-                            }
-                        }
-                        if (mask & (1 << 26)) != 0 {
-                            let v = (if self.i32_mem[25] <= self.i32_mem[26] { 1 } else { 0 }) as i32;
-                            if self.i32_mem[27] != v {
-                                self.i32_mem[27] = v;
-                            }
-                        }
-                        if (mask & (1 << 25)) != 0 {
-                            let v = ((self.i32_mem[12] + self.i32_mem[24])) as i32;
-                            if self.i32_mem[28] != v {
-                                self.i32_mem[28] = v;
-                            }
-                        }
-                    },
+                    _ => {}
+                }
+            },
+
+            "HeaderView" => {
+                match chunk_id {
                     _ => {}
                 }
             },

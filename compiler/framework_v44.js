@@ -11,54 +11,61 @@ const TYPE = { I32: 'I32', F64: 'F64', STR: 'STR', U8: 'U8' };
 // --- CONDITION BUILDER (Fluent if/return/elseif/else) ---
 class ConditionChain {
     constructor(initialCond) {
-        this.branches = []; // Lưu danh sách các nhánh { cond, val }
+        this.branches = [];
         this.currentCond = resolve(initialCond);
     }
 
     return(valInput) {
-        if (!this.currentCond) {
-            // Sửa thông báo lỗi: then -> return
-            throw new Error("[DSL] Missing condition before calling .return()");
-        }
-        this.branches.push({ 
-            cond: this.currentCond, 
-            val: resolve(valInput) 
-        });
-        this.currentCond = null; // Reset để chờ elseif hoặc else
+        if (!this.currentCond) throw new Error("[DSL] Missing condition before calling .return()");
+        this.branches.push({ cond: this.currentCond, valInput: valInput });
+        this.currentCond = null;
         return this;
     }
 
     elseif(condInput) {
-        if (this.currentCond) {
-            // Sửa thông báo lỗi: then -> return
-            throw new Error("[DSL] You must call .return() before .elseif()");
-        }
+        if (this.currentCond) throw new Error("[DSL] You must call .return() before .elseif()");
         this.currentCond = resolve(condInput);
         return this;
     }
 
     else(fallbackInput) {
-        if (this.currentCond) {
-            throw new Error("[DSL] You must call .return() before .else()");
+        if (this.currentCond) throw new Error("[DSL] You must call .return() before .else()");
+        
+        // 1. Quét tìm "Type quyền lực nhất" (F64 lấn át I32)
+        let dominantType = null;
+        const allInputs = [fallbackInput, ...this.branches.map(b => b.valInput)];
+        for (const input of allInputs) {
+            if (input instanceof NodeHandle) {
+                if (input.type === 'F64') dominantType = 'F64';
+                else if (!dominantType) dominantType = input.type;
+            }
+        }
+
+        // 2. Xử lý nhánh Else (Fallback)
+        let result = resolve(fallbackInput, dominantType);
+        
+        // 🌟 AUTO-UPCAST: Nếu kết quả bị kẹt ở I32 nhưng luồng chính cần F64 -> Tự nâng cấp!
+        if (dominantType === 'F64' && result.type === 'I32') {
+            result = result.cast('F64');
         }
         
-        let result = resolve(fallbackInput);
-        
-        // Trình biên dịch mảng nhánh từ phải qua trái (dưới lên trên)
+        // 3. Xử lý các nhánh If / Else-If
         for (let i = this.branches.length - 1; i >= 0; i--) {
             const branch = this.branches[i];
+            let trueNode = resolve(branch.valInput, dominantType);
             
-            // Kiểm tra kiểu dữ liệu đồng nhất
-            if (branch.val.type !== result.type) {
-                throw new Error(`[DSL] Type mismatch in if/else branches: ${branch.val.type} vs ${result.type}. Please explicit cast().`);
+            // 🌟 AUTO-UPCAST: Nâng cấp tương tự cho các nhánh True
+            if (dominantType === 'F64' && trueNode.type === 'I32') {
+                trueNode = trueNode.cast('F64');
             }
             
-            // Tái sử dụng hàm compiler.ifElse
-            const newId = compiler.ifElse(branch.cond, branch.val, result)._id;
-            result = new NodeHandle(newId, branch.val.type);
+            if (trueNode.type !== result.type) {
+                throw new Error(`[DSL] Type mismatch in if/else branches: ${trueNode.type} vs ${result.type}`);
+            }
+            
+            const newId = compiler.ifElse(branch.cond, trueNode, result)._id;
+            result = new NodeHandle(newId, result.type);
         }
-        
-        // Trả về một NodeHandle duy nhất đại diện cho toàn bộ khối logic này
         return result;
     }
 }
@@ -83,9 +90,9 @@ class NodeHandle {
 
     // --- 2. Nhóm toán tử 2 tham số (Binary) ---
     _op(methodName, rhsInput, retType = null, strictType = true) {
-        const rhs = resolve(rhsInput);
+        // 🌟 Bơm this.type làm "Khuôn mẫu" (expectedType) cho các hằng số JS
+        const rhs = resolve(rhsInput, this.type);
         
-        // Cảnh báo Strict Type cho các phép toán yêu cầu cùng kiểu (Tránh logic so sánh bị check strict quá ngặt nghèo)
         if (strictType && this.type !== rhs.type) {
             throw new Error(`Type Mismatch: ${this.type} ${methodName} ${rhs.type}. Explicit cast required.`);
         }
@@ -140,14 +147,16 @@ class NodeHandle {
         return new NodeHandle(newId, targetType); 
     }
 
-    // Thêm vào cuối class NodeHandle (trước hàm cast)
+    // Tìm hàm ifElse trong class NodeHandle và đổi thành:
     ifElse(trueVal, falseVal) {
-        const t = resolve(trueVal);
-        const f = resolve(falseVal);
+        let t = resolve(trueVal);
+        let f = resolve(falseVal);
         
-        // Strict Type: Nhánh True và False phải trả về cùng một kiểu dữ liệu
+        // 🌟 AUTO-UPCAST
         if (t.type !== f.type) {
-            throw new Error(`ifElse Error: True branch (${t.type}) and False branch (${f.type}) must have the same type. Explicit cast if needed.`);
+            if (t.type === 'F64' && f.type === 'I32') f = f.cast('F64');
+            else if (f.type === 'F64' && t.type === 'I32') t = t.cast('F64');
+            else throw new Error(`ifElse Error: True branch (${t.type}) and False branch (${f.type}) must have same type.`);
         }
         
         const newId = compiler.ifElse(this, t, f)._id;
@@ -155,18 +164,20 @@ class NodeHandle {
     }
 }
 
-// Helper: Xử lý số raw (5, 10.5) hoặc chuỗi thành NodeHandle
-function resolve(val) {
+// Thêm tham số expectedType để Engine ngầm định hướng
+function resolve(val, expectedType = null) {
     if (val instanceof NodeHandle) return val;
     
     if (typeof val === 'number') {
-        const isInt = Number.isInteger(val);
-        // Gọi compiler.signal chung, trả về object node có ._id
-        const id = compiler.signal(val)._id;
-        return new NodeHandle(id, isInt ? TYPE.I32 : TYPE.F64);
+        // 🌟 AUTO-COERCION: Nghe theo expectedType từ Engine, nếu không có mới tự suy luận
+        const type = expectedType || (Number.isInteger(val) ? TYPE.I32 : TYPE.F64);
+        
+        // 🌟 QUAN TRỌNG: Truyền type xuống để compiler xếp đúng vào mảng F64
+        const id = compiler.signal(val, type)._id;
+        return new NodeHandle(id, type);
     }
     if (typeof val === 'string') {
-        const id = compiler.signal(val)._id;
+        const id = compiler.signal(val, TYPE.STR)._id;
         return new NodeHandle(id, TYPE.STR);
     }
     

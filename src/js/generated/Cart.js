@@ -2,11 +2,11 @@ import { allocMemory, hydrate, runDispatch, markBatch, bindEvents, setDynamicStr
 
 // --- COMPONENT: Cart ---
 const createCart = (() => {
-    const COUNTS = {"f64":5,"i32":31,"u8":1,"sinks":8,"totalNodes":44,"graphSize":8};
-    const FINGERPRINT = [{"idx":0,"type":"VALUE","selector":"#promo-input"},{"idx":1,"type":"TEXT","selector":"#cart-qty"},{"idx":2,"type":"TEXT","selector":"#global-cart-qty"},{"idx":3,"type":"TEXT","selector":"#cart-subtotal"},{"idx":4,"type":"TEXT","selector":"#cart-discount"},{"idx":5,"type":"TEXT","selector":"#cart-vat"},{"idx":6,"type":"TEXT","selector":"#cart-final"},{"idx":7,"type":"SHOW","selector":"#btn-checkout","displayStyle":"block"}];
-    const LUT = ["","VIP2026","FREESHIP"," đ"];
+    const COUNTS = {"f64":19,"i32":10,"u8":1,"sinks":7,"totalNodes":36,"graphSize":4};
+    const FINGERPRINT = [{"idx":0,"type":"VALUE","selector":"#promo-input"},{"idx":1,"type":"TEXT","selector":"#cart-qty"},{"idx":2,"type":"TEXT","selector":"#cart-subtotal"},{"idx":3,"type":"TEXT","selector":"#cart-discount"},{"idx":4,"type":"TEXT","selector":"#cart-vat"},{"idx":5,"type":"TEXT","selector":"#cart-final"},{"idx":6,"type":"SHOW","selector":"#btn-checkout","displayStyle":"block"}];
+    const LUT = ["","VIP2026","FREESHIP"];
     const EVENTS = [{"selector":"#promo-input","eventName":"input","actionName":"act_0","inputs":[{"path":["value"],"expectedType":"STR"}]}];
-    const SINKS = [1,3,4,6,21,28,30,33];
+    const SINKS = [1,3,5,27,31,33,34];
 
     // Các hàm tính toán c_exec_x được giữ lại dưới dạng "dự phòng", 
     // trong thực tế khi chạy WASM, mảng này không còn được đụng tới nữa.
@@ -14,8 +14,8 @@ const createCart = (() => {
  const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
 let v=0, _res=0;
  
- if (mask & 8388608) { v = (((I32[0] >= 0 ? (LUT[I32[0]] || LUT[0]) : getDynamicString(I32[0])) === (I32[3] >= 0 ? (LUT[I32[3]] || LUT[0]) : getDynamicString(I32[3])) ? 1 : 0)) | 0; if (I32[4] !== v) {   I32[4] = v; FLAGS_C[0] |= 4096; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
-if (mask & 65536) { v = (((I32[0] >= 0 ? (LUT[I32[0]] || LUT[0]) : getDynamicString(I32[0])) === (I32[9] >= 0 ? (LUT[I32[9]] || LUT[0]) : getDynamicString(I32[9])) ? 1 : 0)) | 0; if (I32[10] !== v) {   I32[10] = v; FLAGS_C[0] |= 8192; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
+ if (mask & 4194304) { v = (((I32[0] >= 0 ? (LUT[I32[0]] || LUT[0]) : getDynamicString(I32[0])) === (I32[2] >= 0 ? (LUT[I32[2]] || LUT[0]) : getDynamicString(I32[2])) ? 1 : 0)) | 0; if (I32[3] !== v) {   I32[3] = v; FLAGS_C[0] |= 2097152; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
+if (mask & 65536) { v = (((I32[0] >= 0 ? (LUT[I32[0]] || LUT[0]) : getDynamicString(I32[0])) === (I32[5] >= 0 ? (LUT[I32[5]] || LUT[0]) : getDynamicString(I32[5])) ? 1 : 0)) | 0; if (I32[6] !== v) {   I32[6] = v; FLAGS_C[0] |= 32768; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; }  } 
  };
 const c_exec_1 = null;
     const r_exec_0 = (mem, mask) => { 
@@ -49,8 +49,8 @@ if (mask & 268435456) {
                         CACHE[1] = textVal; 
                     }
                  } 
-if (mask & 134217728) { 
-                    const textVal = String(I32[1]);
+if (mask & 67108864) { 
+                    const textVal = String(F64[0]);
                     if (CACHE[2] !== textVal) { 
                         if (CACHE[2] === null) {
                             if (DOM[2].textContent !== String(textVal)) DOM[2].textContent = textVal;
@@ -60,8 +60,8 @@ if (mask & 134217728) {
                         CACHE[2] = textVal; 
                     }
                  } 
-if (mask & 33554432) { 
-                    const textVal = String(I32[2]) + (LUT[3] || LUT[0]);
+if (mask & 16) { 
+                    const textVal = String(F64[14]);
                     if (CACHE[3] !== textVal) { 
                         if (CACHE[3] === null) {
                             if (DOM[3].textContent !== String(textVal)) DOM[3].textContent = textVal;
@@ -71,8 +71,8 @@ if (mask & 33554432) {
                         CACHE[3] = textVal; 
                     }
                  } 
-if (mask & 1024) { 
-                    const textVal = String(I32[15]) + (LUT[3] || LUT[0]);
+if (mask & 1) { 
+                    const textVal = String(F64[17]);
                     if (CACHE[4] !== textVal) { 
                         if (CACHE[4] === null) {
                             if (DOM[4].textContent !== String(textVal)) DOM[4].textContent = textVal;
@@ -82,8 +82,13 @@ if (mask & 1024) {
                         CACHE[4] = textVal; 
                     }
                  } 
-if (mask & 8) { 
-                    const textVal = String(I32[20]) + (LUT[3] || LUT[0]);
+ };
+const r_exec_1 = (mem, mask) => { 
+ const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
+let v=0, _res=0;
+ 
+ if (mask & 1073741824) { 
+                    const textVal = String(F64[18]);
                     if (CACHE[5] !== textVal) { 
                         if (CACHE[5] === null) {
                             if (DOM[5].textContent !== String(textVal)) DOM[5].textContent = textVal;
@@ -93,31 +98,15 @@ if (mask & 8) {
                         CACHE[5] = textVal; 
                     }
                  } 
-if (mask & 2) { 
-                    const textVal = String(I32[21]) + (LUT[3] || LUT[0]);
-                    if (CACHE[6] !== textVal) { 
-                        if (CACHE[6] === null) {
-                            if (DOM[6].textContent !== String(textVal)) DOM[6].textContent = textVal;
-                        } else {
-                            DOM[6].textContent = textVal;
-                        }
-                        CACHE[6] = textVal; 
-                    }
-                 } 
- };
-const r_exec_1 = (mem, mask) => { 
- const { F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, DOM, CACHE, GRAPH } = mem;
-let v=0, _res=0;
- 
- if (mask & 1073741824) { const val = I32[23];
-if (CACHE[7] !== val) { 
+if (mask & 536870912) { const val = I32[1];
+if (CACHE[6] !== val) { 
   const targetStyle = val ? "block" : "none";
-  if (CACHE[7] === null) {
-    if (DOM[7].style.display !== targetStyle) DOM[7].style.display = targetStyle;
+  if (CACHE[6] === null) {
+    if (DOM[6].style.display !== targetStyle) DOM[6].style.display = targetStyle;
   } else {
-    DOM[7].style.display = targetStyle;
+    DOM[6].style.display = targetStyle;
   }
-  CACHE[7] = val; 
+  CACHE[6] = val; 
 } } 
  };
 
@@ -129,6 +118,18 @@ r_exec_0, r_exec_1
 ];
 
     const EXPORTED_PORTS = {
+  "PORT_CART_QTY": { 
+    id: 1, 
+    type: "I32", 
+    semantic: "I32", 
+    propagate: (mem) => { const { FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH } = mem; FLAGS_R[0] |= 268435456; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[1] |= 536870912; L2_R[0] |= 1073741824; L1_R[0] |= -2147483648;  } 
+  },
+  "PORT_CART_SUBTOTAL": { 
+    id: 0, 
+    type: "F64", 
+    semantic: "F64", 
+    propagate: (mem) => { const { FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH } = mem; markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 0, 4); FLAGS_R[0] |= 67108864; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648;  } 
+  },
 };
 
     return function(root, actions = {}, instanceId = "") {
@@ -137,46 +138,30 @@ r_exec_0, r_exec_1
         const mem = allocMemory(COUNTS, "Cart");
         const { F64, I32, U8, DOM, CACHE, GRAPH, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R } = mem; 
         
-        F64.set([0,0,0,0,0]); 
-        I32.set([0,0,0,1,0,20,0,100,0,2,0,30000,0,0,0,0,0,8,0,100,0,0,0,0,0,0,0,0,0,0,0]); 
+        F64.set([0,0.2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.08,0,0]); 
+        I32.set([0,0,1,0,30000,2,0,0,1,0]); 
         U8.set([1]);
-        GRAPH.set([10,20,22,41,10,20,22,41]);
+        GRAPH.set([7,19,21,28]);
 
         hydrate(root, FINGERPRINT, mem.DOM, mem.CACHE);
 
         Object.assign(actions, {
             act_0: (newVal) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
 const _newVal_newVal = setDynamicString(newVal);
-if (I32[24] !== _newVal_newVal) {
-  if (I32[24] < 0) releaseDynamicString(I32[24]);
-  I32[24] = _newVal_newVal;
+if (I32[9] !== _newVal_newVal) {
+  if (I32[9] < 0) releaseDynamicString(I32[9]);
+  I32[9] = _newVal_newVal;
 } else {
   if (_newVal_newVal < 0) releaseDynamicString(_newVal_newVal);
 }
-const _tempVal_2 = I32[24];
+const _tempVal_2 = I32[9];
 if (_tempVal_2 < 0) retainDynamicString(_tempVal_2);
 if (I32[0] < 0) releaseDynamicString(I32[0]);
 I32[0] = _tempVal_2;
-FLAGS_C[0] |= 8388608; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_C[0] |= 65536; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_R[0] |= 1073741824; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); },
-    act_1: (qty, price) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-I32[25] = qty;
-FLAGS_C[1] |= 67108864; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_C[1] |= 33554432; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; F64[2] = price;
-FLAGS_C[1] |= 16777216; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; const _tempVal_0 = ((I32[1] + I32[25]));
-I32[1] = (_tempVal_0) | 0;
-FLAGS_C[1] |= -2147483648; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_C[1] |= 67108864; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_R[0] |= 268435456; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[0] |= 134217728; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; const _tempVal_1 = ((I32[2] + ((((I32[25]) * F64[2])))));
-I32[2] = (_tempVal_1) | 0;
-markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 0, 4); FLAGS_R[0] |= 33554432; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); },
-    act_2: (totalQ, totalS) => { const {F64, I32, U8, FLAGS_C, L2_C, L1_C, FLAGS_R, L2_R, L1_R, GRAPH} = mem;
-I32[29] = totalQ;
-I32[30] = totalS;
-const _tempVal_0 = I32[29];
-I32[1] = (_tempVal_0) | 0;
-FLAGS_C[1] |= -2147483648; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_C[1] |= 67108864; L2_C[0] |= 1073741824; L1_C[0] |= -2147483648; FLAGS_R[0] |= 268435456; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; FLAGS_R[0] |= 134217728; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; const _tempVal_1 = I32[30];
-I32[2] = (_tempVal_1) | 0;
-markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 4, 8); FLAGS_R[0] |= 33554432; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); }
+FLAGS_C[0] |= 4194304; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_C[0] |= 65536; L2_C[0] |= -2147483648; L1_C[0] |= -2147483648; FLAGS_R[0] |= 1073741824; L2_R[0] |= -2147483648; L1_R[0] |= -2147483648; Motherboard.wakeUp(); }
         });
 
-        const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, {"ADD_ITEM_ACTION":"act_1","SYNC_CART_ACTION":"act_2"}, actions, 0);
+        const _mbId = Motherboard.register(finalName, mem, BATCHES_C, BATCHES_R, EXPORTED_PORTS, {}, actions, 0);
         bindEvents(root, EVENTS, _mbId);
 
         for (let i = 0; i < COUNTS.totalNodes; i++) {
@@ -189,7 +174,7 @@ markBatch(FLAGS_C, L2_C, L1_C, GRAPH, 4, 8); FLAGS_R[0] |= 33554432; L2_R[0] |= 
         Motherboard.enqueue(_mbId);
         Motherboard.wakeUp();
 
-        const STR_INDICES = [0,3,9,24];
+        const STR_INDICES = [0,2,5,9];
 
         
 

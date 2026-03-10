@@ -52,6 +52,15 @@
         .btn-close-modal:hover { background: #475569; }
         .particle { position: fixed; top: 0; left: 0; width: 60px; height: 60px; border-radius: 50%; pointer-events: none; z-index: 9999; opacity: 0; transform: translate(-100px, -100px) scale(0.1); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); will-change: transform, opacity; }
         .particle.flying { transition: transform 0.6s cubic-bezier(0.5, -0.5, 0.2, 1), opacity 0.6s ease-in; }
+        #cart-subtotal::after, 
+        #cart-discount::after, 
+        #cart-vat::after, 
+        #cart-final::after { 
+            content: " đ"; 
+        }
+        .product-price::after {
+            content: " đ";
+        }
     </style>
 </head>
 <body>

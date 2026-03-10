@@ -887,9 +887,12 @@ export const Router = {
             }
         } else {
             // TRƯỜNG HỢP B: TỪ LẦN THỨ 2 TRỞ ĐI (Zero-Allocation Navigation)
-            // Lúc này không fetch, không parse HTML, chỉ ghi số 1 vào RAM.
-            // console.log(`[Router DOD] ♻️ Đánh thức View: ${targetName} (0ms)`);
             targetInstance.plug();
+            Motherboard.enqueue(targetInstance._mbId);
+            
+            // 🌟 CHUẨN FRAMEWORK: Lõi Engine chỉ phát tín hiệu báo cáo vòng đời (Lifecycle hook)
+            // Tuyệt đối không chứa logic dự án ở đây.
+            window.dispatchEvent(new CustomEvent('dod:view-plugged', { detail: targetName }));
         }
 
         // 3. Cập nhật trạng thái và ép Frame tiếp theo render
